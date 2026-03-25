@@ -27,12 +27,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <aside className="sidebar">
           <a href="https://apps.tmrs.studio/" target="_blank" rel="noopener noreferrer" className="sidebar-brand">
             <img
-              src="/logo.png"
-              alt="TMRS Studios"
+              src="/LogoAplicationRegistryWhiteBackground.png"
+              alt="Application Registry"
               className="sidebar-brand-logo"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
-            <span className="sidebar-brand-label">AREG</span>
+            <span className="sidebar-brand-label">Application Registry</span>
           </a>
 
           <nav className="sidebar-nav">

@@ -50,20 +50,28 @@
 }
 
 .auth-hero__presents {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-text-muted);
-  margin: 0 0 var(--space-2);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: #000000;
+  margin: 0 0 var(--space-4);
+}
+
+.auth-hero__logo {
+  display: block;
+  max-height: 80px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  margin: 0 auto var(--space-4);
+  overflow: visible;
 }
 
 .auth-hero__name {
   font-family: var(--font-heading);
-  font-size: 3.5rem;
+  font-size: 4rem;
   font-weight: 700;
   color: var(--color-text-heading);
-  margin: 0 0 var(--space-2);
+  margin: -0.25em 0 var(--space-2);
   line-height: 1.1;
 }
 
@@ -150,5 +158,5 @@
 @media (max-width: 480px) {
   .auth-header { padding: 0 var(--space-4); }
   .auth-card { padding: var(--space-6) var(--space-5); border-radius: var(--radius-md); }
-  .auth-hero__name { font-size: 2.5rem; }
+  .auth-hero__name { font-size: 2.75rem; }
 }

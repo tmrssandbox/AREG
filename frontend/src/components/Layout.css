@@ -39,14 +39,18 @@
   height: 32px;
   width: auto;
   flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  padding: 2px 4px;
 }
 
 .sidebar-brand-label {
   font-family: var(--font-heading);
-  font-size: var(--text-lg);
+  font-size: var(--text-sm);
   font-weight: 700;
   color: #ffffff;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
 }
 
 .sidebar-nav {

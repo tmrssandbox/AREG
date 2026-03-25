@@ -45,9 +45,14 @@ export default function LoginPage() {
       <main className="auth-main">
         <div className="auth-card">
           <div className="auth-hero">
-            <p className="auth-hero__presents">TMRS Studios presents</p>
-            <p className="auth-hero__name">AREG</p>
-            <p className="auth-hero__tagline">Application Registry — manage your enterprise application catalog.</p>
+            <p className="auth-hero__presents">TMRS Studios presents:</p>
+            <img
+              src="/LogoAplicationRegistryWhiteBackground.png"
+              alt="Application Registry"
+              className="auth-hero__logo"
+            />
+            <p className="auth-hero__name">Application Registry</p>
+            <p className="auth-hero__tagline">Manage your enterprise application catalog.</p>
           </div>
 
           <h1 className="auth-card-title">Sign in</h1>
