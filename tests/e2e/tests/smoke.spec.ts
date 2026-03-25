@@ -1,9 +1,10 @@
 import { test, expect, Browser, Page } from '@playwright/test';
 import * as path from 'path';
 
-const EMAIL    = process.env.AREG_TEST_EMAIL    ?? 'test-admin@areg.local';
-const PASSWORD = process.env.AREG_TEST_PASSWORD ?? '';
-const APP_NAME = 'AREG_TEST_APP';
+const BASE      = process.env.AREG_API_URL ?? 'https://aw3itbmhii.execute-api.us-east-2.amazonaws.com';
+const EMAIL     = process.env.AREG_TEST_EMAIL    ?? 'test-admin@areg.local';
+const PASSWORD  = process.env.AREG_TEST_PASSWORD ?? '';
+const APP_NAME  = 'AREG_TEST_APP';
 const IMPORT_NAME = 'AREG_TEST_IMPORT';
 
 // All tests run serially in a single browser page to preserve login state
@@ -11,11 +12,53 @@ test.describe.configure({ mode: 'serial' });
 
 let browser: Browser;
 let page: Page;
+let apiToken = '';
+
+/** Obtain a JWT token via Cognito (used for pre/post test cleanup) */
+async function getToken(): Promise<string> {
+  if (apiToken) return apiToken;
+  const poolId = process.env.AREG_USER_POOL_ID ?? 'us-east-2_Ts0PtOaEc';
+  const clientId = process.env.AREG_CLIENT_ID  ?? '117u215jcpi0n2nsd4ud5fdn5j';
+  const res = await fetch(
+    `https://cognito-idp.us-east-2.amazonaws.com/`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-amz-json-1.1',
+        'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth',
+      },
+      body: JSON.stringify({
+        AuthFlow: 'USER_PASSWORD_AUTH',
+        ClientId: clientId,
+        AuthParameters: { USERNAME: EMAIL, PASSWORD },
+      }),
+    },
+  );
+  const data = await res.json() as { AuthenticationResult?: { IdToken?: string } };
+  apiToken = data.AuthenticationResult?.IdToken ?? '';
+  return apiToken;
+}
+
+/** Delete all active+deleted records matching a name prefix */
+async function cleanupTestRecords(prefix: string) {
+  const token = await getToken();
+  // Fetch active records
+  const res = await fetch(`${BASE}/apps?limit=1000`, { headers: { Authorization: `Bearer ${token}` } });
+  const data = await res.json() as { items?: { appId: string; name: string; status: string }[] };
+  for (const item of data.items ?? []) {
+    if (item.name.startsWith(prefix)) {
+      await fetch(`${BASE}/apps/${item.appId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    }
+  }
+}
 
 test.beforeAll(async ({ browser: b }) => {
   if (!PASSWORD) throw new Error('AREG_TEST_PASSWORD env var is required');
   browser = b;
   page = await browser.newPage();
+  // Pre-flight: remove any leftover test records from previous runs
+  await cleanupTestRecords(APP_NAME);
+  await cleanupTestRecords(IMPORT_NAME);
 });
 
 test.afterAll(async () => {
@@ -36,9 +79,12 @@ test('login redirects to dashboard', async () => {
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
 test('dashboard displays stat cards', async () => {
-  await expect(page.locator('text=Total')).toBeVisible();
-  await expect(page.locator('text=Active')).toBeVisible();
-  await expect(page.locator('text=Renewal')).toBeVisible();
+  // Already on / after login; wait for data to load
+  await page.waitForLoadState('networkidle', { timeout: 15_000 });
+  // Stat cards should be visible once data loads
+  await expect(page.locator('text=Total Apps')).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('text=Active').first()).toBeVisible();
+  await expect(page.locator('text=Renewals').first()).toBeVisible();
 });
 
 // ── Catalog — add record ──────────────────────────────────────────────────────
@@ -50,21 +96,31 @@ test('catalog page loads', async () => {
 });
 
 test('add new application record', async () => {
-  // Open the add/new modal
-  await page.click('button:has-text("Add"), button:has-text("New")');
-  await page.waitForSelector('input[name="name"], input[placeholder*="name" i]');
+  // Open the add modal
+  await page.click('button:has-text("Add App")');
 
-  await page.fill('input[name="name"], input[placeholder*="name" i]', APP_NAME);
-  await page.fill('input[name="description"], input[placeholder*="description" i]', 'E2E smoke test application');
-  await page.fill('input[name="vendor"], input[placeholder*="vendor" i]', 'SmokeVendor');
-  await page.fill('input[name="itContact"], input[placeholder*="it" i], input[name*="contact" i]', 'smoke@test.local');
-  await page.fill('input[name="businessOwner"], input[placeholder*="owner" i]', 'owner@test.local');
-  await page.fill('input[name="hoursOfOperation"], input[placeholder*="hours" i]', '9-5 M-F');
-  await page.fill('input[name="department"], input[placeholder*="department" i]', 'QA');
-  await page.fill('input[type="date"], input[name="renewalDate"]', '2027-06-30');
+  // Wait for the modal overlay (.fixed) to appear
+  const modal = page.locator('.fixed');
+  await modal.waitFor({ timeout: 5_000 });
+  await expect(modal.locator('h2')).toContainText('Add Application');
 
-  await page.click('button[type="submit"]:has-text("Save"), button:has-text("Create"), button:has-text("Add")');
-  await page.waitForSelector(`text=${APP_NAME}`, { timeout: 10_000 });
+  // Form field order (from AppFormModal): name, [description textarea], vendor,
+  // itContact, businessOwner, hoursOfOperation, [department, renewalDate, notes]
+  const inputs    = modal.locator('input');
+  const textareas = modal.locator('textarea');
+
+  await inputs.nth(0).fill(APP_NAME);           // name
+  await inputs.nth(1).fill('SmokeVendor');      // vendor
+  await inputs.nth(2).fill('smoke@test.local'); // itContact
+  await inputs.nth(3).fill('owner@test.local'); // businessOwner
+  await inputs.nth(4).fill('9-5 M-F');          // hoursOfOperation
+  await inputs.nth(5).fill('QA');               // department
+  await inputs.nth(6).fill('2027-06-30');        // renewalDate
+
+  await textareas.nth(0).fill('E2E smoke test application'); // description
+
+  await modal.locator('button[type="submit"]').click();
+  await page.waitForSelector(`td:has-text("${APP_NAME}"), tr:has-text("${APP_NAME}")`, { timeout: 10_000 });
   await expect(page.locator(`text=${APP_NAME}`).first()).toBeVisible();
 });
 
@@ -95,57 +151,48 @@ test('department filter can be applied and cleared', async () => {
 // ── Catalog — edit record ─────────────────────────────────────────────────────
 
 test('edit the test record', async () => {
-  // Click the record row or an edit button
-  const row = page.locator(`tr:has-text("${APP_NAME}"), [data-name="${APP_NAME}"]`).first();
-  await row.click();
+  await page.locator(`tr:has-text("${APP_NAME}")`).first().click();
 
-  // Wait for detail panel / edit modal
-  const editBtn = page.locator('button:has-text("Edit")').first();
-  await editBtn.waitFor({ timeout: 5_000 });
-  await editBtn.click();
+  // Detail modal opens — click Edit
+  const modal = page.locator('.fixed');
+  await expect(modal.locator('button:has-text("Edit")')).toBeVisible({ timeout: 5_000 });
+  await modal.locator('button:has-text("Edit")').click();
 
-  const notesInput = page.locator('input[name="notes"], textarea[name="notes"]').first();
-  await notesInput.fill('Updated by E2E smoke test');
-  await page.click('button[type="submit"]:has-text("Save"), button:has-text("Update")');
-  await page.waitForTimeout(1_000);
+  // Now shows AppFormModal for editing — notes is textareas.nth(1)
+  const editModal = page.locator('.fixed');
+  await expect(editModal.locator('h2')).toContainText('Edit Application', { timeout: 5_000 });
+  await editModal.locator('textarea').nth(1).fill('Updated by E2E smoke test');
+  await editModal.locator('button[type="submit"]').click();
+  // Wait for modal to close
+  await expect(page.locator('.fixed')).not.toBeVisible({ timeout: 8_000 });
 });
 
 // ── Audit log ─────────────────────────────────────────────────────────────────
 
 test('audit log shows update event', async () => {
-  // Open the record and look for audit tab / button
-  const row = page.locator(`tr:has-text("${APP_NAME}"), [data-name="${APP_NAME}"]`).first();
-  await row.click();
-  const auditBtn = page.locator('button:has-text("Audit"), button:has-text("History")').first();
-  if (await auditBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
-    await auditBtn.click();
-    await expect(page.locator('text=update').first()).toBeVisible({ timeout: 5_000 });
-  } else {
-    test.info().annotations.push({ type: 'skip-reason', description: 'Audit button not found in detail panel' });
-  }
+  await page.locator(`tr:has-text("${APP_NAME}")`).first().click();
+  const modal = page.locator('.fixed');
+  const auditTab = modal.locator('button:has-text("Audit")');
+  await expect(auditTab).toBeVisible({ timeout: 5_000 });
+  await auditTab.click();
+  await expect(modal.locator('text=UPDATE').first()).toBeVisible({ timeout: 8_000 });
+  // Close modal and wait for it to disappear
+  await modal.locator('button:has-text("×")').click();
+  await expect(page.locator('.fixed')).not.toBeVisible({ timeout: 5_000 });
 });
 
 // ── Delete record ─────────────────────────────────────────────────────────────
 
 test('delete the test record', async () => {
-  await page.goto('/catalog');
-  await page.waitForSelector(`text=${APP_NAME}`, { timeout: 10_000 });
-
-  const row = page.locator(`tr:has-text("${APP_NAME}"), [data-name="${APP_NAME}"]`).first();
-  await row.click();
-
-  const deleteBtn = page.locator('button:has-text("Delete"), button:has-text("Archive")').first();
-  await deleteBtn.waitFor({ timeout: 5_000 });
-  await deleteBtn.click();
-
-  // Confirm dialog if present
-  const confirmBtn = page.locator('button:has-text("Confirm"), button:has-text("Yes"), button:has-text("Delete")').last();
-  if (await confirmBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
-    await confirmBtn.click();
-  }
-
-  await page.waitForTimeout(1_500);
-  await expect(page.locator(`text=${APP_NAME}`).first()).not.toBeVisible({ timeout: 5_000 });
+  await page.locator(`tr:has-text("${APP_NAME}")`).first().click();
+  const modal = page.locator('.fixed');
+  await expect(modal.locator('button:has-text("Delete")')).toBeVisible({ timeout: 5_000 });
+  await modal.locator('button:has-text("Delete")').click();
+  // Confirm button appears
+  await expect(modal.locator('button:has-text("Confirm Delete")')).toBeVisible({ timeout: 3_000 });
+  await modal.locator('button:has-text("Confirm Delete")').click();
+  await expect(page.locator('.fixed')).not.toBeVisible({ timeout: 8_000 });
+  await expect(page.locator(`tr:has-text("${APP_NAME}")`)).not.toBeVisible({ timeout: 5_000 });
 });
 
 // ── Archive — restore record ──────────────────────────────────────────────────
@@ -153,39 +200,27 @@ test('delete the test record', async () => {
 test('archive page shows deleted record and can restore', async () => {
   await page.click('a[href="/archive"]');
   await page.waitForURL('/archive');
-  await expect(page.locator(`text=${APP_NAME}`).first()).toBeVisible({ timeout: 10_000 });
-
-  const row = page.locator(`tr:has-text("${APP_NAME}"), [data-name="${APP_NAME}"]`).first();
-  await row.click();
-
-  const restoreBtn = page.locator('button:has-text("Restore")').first();
-  await restoreBtn.waitFor({ timeout: 5_000 });
+  // Count rows before restore (strict: use first matching row's button)
+  const restoreBtn = page.locator(`tr:has-text("${APP_NAME}") button:has-text("Restore")`).first();
+  await expect(restoreBtn).toBeVisible({ timeout: 10_000 });
+  const countBefore = await page.locator(`tr:has-text("${APP_NAME}")`).count();
   await restoreBtn.click();
-
-  await page.waitForTimeout(1_500);
-  // Record should leave archive view
-  await expect(page.locator(`text=${APP_NAME}`).first()).not.toBeVisible({ timeout: 5_000 });
+  // After restore, one fewer AREG_TEST_APP row in the archive
+  await expect(page.locator(`tr:has-text("${APP_NAME}")`)).toHaveCount(countBefore - 1, { timeout: 5_000 });
 });
 
-// ── Final cleanup — delete restored record permanently ────────────────────────
+// ── Final cleanup — delete restored record ────────────────────────────────────
 
 test('cleanup: delete test record from catalog', async () => {
   await page.goto('/catalog');
-  await page.waitForSelector(`text=${APP_NAME}`, { timeout: 10_000 });
-
-  const row = page.locator(`tr:has-text("${APP_NAME}"), [data-name="${APP_NAME}"]`).first();
-  await row.click();
-
-  const deleteBtn = page.locator('button:has-text("Delete"), button:has-text("Archive")').first();
-  await deleteBtn.waitFor({ timeout: 5_000 });
-  await deleteBtn.click();
-
-  const confirmBtn = page.locator('button:has-text("Confirm"), button:has-text("Yes"), button:has-text("Delete")').last();
-  if (await confirmBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
-    await confirmBtn.click();
-  }
-
-  await page.waitForTimeout(1_500);
+  await page.waitForSelector(`tr:has-text("${APP_NAME}")`, { timeout: 10_000 });
+  await page.locator(`tr:has-text("${APP_NAME}")`).first().click();
+  const modal = page.locator('.fixed');
+  await expect(modal.locator('button:has-text("Delete")')).toBeVisible({ timeout: 5_000 });
+  await modal.locator('button:has-text("Delete")').click();
+  await expect(modal.locator('button:has-text("Confirm Delete")')).toBeVisible({ timeout: 3_000 });
+  await modal.locator('button:has-text("Confirm Delete")').click();
+  await expect(page.locator('.fixed')).not.toBeVisible({ timeout: 8_000 });
 });
 
 // ── CSV Import ────────────────────────────────────────────────────────────────

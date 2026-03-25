@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto';
 export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'RESTORE';
 
 export interface Diff {
-  [field: string]: { old: unknown; new: unknown };
+  [field: string]: { old?: unknown; new?: unknown };
 }
 
 export async function writeAudit(
@@ -16,6 +16,20 @@ export async function writeAudit(
 ): Promise<void> {
   const timestamp = new Date().toISOString();
   const sk = `AUDIT#${timestamp}#${randomUUID()}`;
+
+  // Strip undefined values from diff entries (DynamoDB rejects undefined)
+  const cleanDiff: Diff | undefined = diff
+    ? Object.fromEntries(
+        Object.entries(diff).map(([k, v]) => [
+          k,
+          {
+            ...(v.old !== undefined ? { old: v.old } : {}),
+            ...(v.new !== undefined ? { new: v.new } : {}),
+          },
+        ]),
+      )
+    : undefined;
+
   await ddb.send(new PutCommand({
     TableName: TABLE_AUDIT,
     Item: {
@@ -24,7 +38,7 @@ export async function writeAudit(
       action,
       userEmail,
       timestamp,
-      ...(diff ? { diff } : {}),
+      ...(cleanDiff ? { diff: cleanDiff } : {}),
     },
   }));
 }

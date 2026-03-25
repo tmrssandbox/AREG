@@ -221,10 +221,16 @@ export class AregStack extends cdk.Stack {
       integration: lambdaIntegration,
     });
 
-    // All other routes — Cognito JWT required
+    // All other routes — Cognito JWT required (OPTIONS excluded so CORS preflight passes)
     httpApi.addRoutes({
       path:        '/{proxy+}',
-      methods:     [apigwv2.HttpMethod.ANY],
+      methods:     [
+        apigwv2.HttpMethod.GET,
+        apigwv2.HttpMethod.POST,
+        apigwv2.HttpMethod.PUT,
+        apigwv2.HttpMethod.DELETE,
+        apigwv2.HttpMethod.PATCH,
+      ],
       integration: lambdaIntegration,
       authorizer:  jwtAuthorizer,
     });

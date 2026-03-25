@@ -53,7 +53,9 @@ export async function updateApp(
   updated['modifiedBy'] = caller.email;
   updated['modifiedAt'] = now;
 
-  await ddb.send(new PutCommand({ TableName: TABLE_APPS, Item: updated }));
+  // Strip undefined values before writing (DynamoDB lib rejects them)
+  const clean = Object.fromEntries(Object.entries(updated).filter(([, v]) => v !== undefined));
+  await ddb.send(new PutCommand({ TableName: TABLE_APPS, Item: clean }));
   if (Object.keys(diff).length > 0) {
     await writeAudit(appId, 'UPDATE', caller.email, diff);
   }
