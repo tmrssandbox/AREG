@@ -15,6 +15,14 @@
   margin-bottom: var(--space-6);
 }
 
+.settings-danger {
+  border-color: var(--color-error-light);
+}
+
+.settings-danger h2 {
+  color: var(--color-error);
+}
+
 .settings-section h2 {
   font-size: var(--text-lg);
   margin-bottom: var(--space-4);

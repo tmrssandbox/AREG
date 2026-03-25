@@ -1,13 +1,15 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { updatePassword, setUpTOTP, verifyTOTPSetup, updateMFAPreference, fetchMFAPreference } from 'aws-amplify/auth';
+import { updatePassword, setUpTOTP, verifyTOTPSetup, updateMFAPreference, fetchMFAPreference, deleteUser } from 'aws-amplify/auth';
 import { QRCodeSVG } from 'qrcode.react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import './ProfilePage.css';
 
 type TotpStep = 'idle' | 'scan' | 'verify';
 
 export default function ProfilePage() {
-  const { email, role } = useAuth();
+  const { email, role, logout } = useAuth();
+  const navigate = useNavigate();
 
   // Change password
   const [oldPassword,     setOldPassword]     = useState('');
@@ -26,6 +28,11 @@ export default function ProfilePage() {
   const [mfaMsg,      setMfaMsg]      = useState('');
   const [mfaErr,      setMfaErr]      = useState('');
   const [mfaBusy,     setMfaBusy]     = useState(false);
+
+  // Delete account
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleteErr,     setDeleteErr]     = useState('');
+  const [deleteBusy,    setDeleteBusy]    = useState(false);
 
   useEffect(() => {
     fetchMFAPreference()
@@ -104,6 +111,20 @@ export default function ProfilePage() {
       setMfaErr(err instanceof Error ? err.message : 'Failed to disable 2FA.');
     } finally {
       setMfaBusy(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (deleteConfirm !== email) { setDeleteErr('Type your email to confirm.'); return; }
+    setDeleteErr('');
+    setDeleteBusy(true);
+    try {
+      await deleteUser();
+      await logout();
+      navigate('/login');
+    } catch (err: unknown) {
+      setDeleteErr(err instanceof Error ? err.message : 'Delete failed.');
+      setDeleteBusy(false);
     }
   }
 
@@ -203,6 +224,33 @@ export default function ProfilePage() {
             )}
           </>
         )}
+      </section>
+      {/* Delete account */}
+      <section className="settings-section settings-danger">
+        <h2>Delete account</h2>
+        <p className="settings-desc">
+          Permanently delete your account. This cannot be undone.
+        </p>
+        {deleteErr && <div className="profile-error">{deleteErr}</div>}
+        <div className="settings-field">
+          <label htmlFor="delete-confirm">
+            Type your email to confirm: <strong>{email}</strong>
+          </label>
+          <input
+            id="delete-confirm"
+            type="email"
+            value={deleteConfirm}
+            onChange={e => setDeleteConfirm(e.target.value)}
+            placeholder={email ?? ''}
+          />
+        </div>
+        <button
+          className="btn-danger"
+          onClick={handleDeleteAccount}
+          disabled={deleteBusy || deleteConfirm !== email}
+        >
+          {deleteBusy ? 'Deleting…' : 'Delete my account'}
+        </button>
       </section>
     </div>
   );
