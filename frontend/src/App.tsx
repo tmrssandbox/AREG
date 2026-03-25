@@ -5,6 +5,8 @@ import LoginPage       from './pages/LoginPage';
 import DashboardPage   from './pages/DashboardPage';
 import CatalogPage     from './pages/CatalogPage';
 import ArchivePage     from './pages/ArchivePage';
+import ImportPage      from './pages/ImportPage';
+import UsersPage       from './pages/UsersPage';
 
 export default function App() {
   return (
@@ -20,6 +22,12 @@ export default function App() {
           } />
           <Route path="/archive" element={
             <ProtectedRoute adminOnly><ArchivePage /></ProtectedRoute>
+          } />
+          <Route path="/import" element={
+            <ProtectedRoute adminOnly><ImportPage /></ProtectedRoute>
+          } />
+          <Route path="/users" element={
+            <ProtectedRoute adminOnly><UsersPage /></ProtectedRoute>
           } />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

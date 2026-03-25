@@ -1,17 +1,16 @@
 {
-  "name": "areg-lambda",
+  "name": "areg-lambda-alerts",
   "version": "1.0.0",
-  "description": "AREG API Lambda handler",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "test": "jest",
-    "test:api": "jest --testPathPattern=integration"
+    "test:unit": "jest"
   },
   "dependencies": {
-    "@aws-sdk/client-cognito-identity-provider": "^3.1017.0",
     "@aws-sdk/client-dynamodb": "^3.0.0",
-    "@aws-sdk/lib-dynamodb": "^3.0.0"
+    "@aws-sdk/lib-dynamodb": "^3.0.0",
+    "@aws-sdk/client-ses": "^3.0.0"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.140",
@@ -24,8 +23,6 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
-    "testMatch": [
-      "**/test/unit/**/*.test.ts"
-    ]
+    "testMatch": ["**/test/**/*.test.ts"]
   }
 }

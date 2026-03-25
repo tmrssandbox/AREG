@@ -5,6 +5,8 @@ import { createApp }  from './handlers/createApp';
 import { updateApp }  from './handlers/updateApp';
 import { deleteApp, restoreApp } from './handlers/deleteApp';
 import { getAudit }   from './handlers/getAudit';
+import { importApps } from './handlers/importApps';
+import { listUsers, inviteUser, updateUserRole, deactivateUser, enableUser } from './handlers/users';
 
 type LambdaEvent = APIGatewayProxyEventV2WithJWTAuthorizer | ScheduledEvent;
 
@@ -40,7 +42,12 @@ export async function handler(event: LambdaEvent): Promise<APIGatewayProxyResult
   // Apps routes
   if (method === 'GET'  && path === '/apps')           return listApps(event);
   if (method === 'GET'  && path === '/apps/archived')  return listApps({ ...event, queryStringParameters: { ...event.queryStringParameters, status: 'deleted' } });
+  if (method === 'POST' && path === '/apps/import')    return importApps(event);
   if (method === 'POST' && path === '/apps')           return createApp(event);
+
+  // Users routes (Admin only)
+  if (method === 'GET'  && path === '/users')          return listUsers(event);
+  if (method === 'POST' && path === '/users/invite')   return inviteUser(event);
 
   // /apps/{id}
   const appMatch = path.match(/^\/apps\/([^/]+)$/);
@@ -58,6 +65,17 @@ export async function handler(event: LambdaEvent): Promise<APIGatewayProxyResult
   // /audit/{appId}
   const auditMatch = path.match(/^\/audit\/([^/]+)$/);
   if (auditMatch && method === 'GET') return getAudit(event, auditMatch[1]);
+
+  // /users/{username}/enable
+  const userEnableMatch = path.match(/^\/users\/([^/]+)\/enable$/);
+  if (userEnableMatch && method === 'POST') return enableUser(event, decodeURIComponent(userEnableMatch[1]));
+
+  // /users/{username}
+  const userMatch = path.match(/^\/users\/([^/]+)$/);
+  if (userMatch) {
+    if (method === 'PUT')    return updateUserRole(event, decodeURIComponent(userMatch[1]));
+    if (method === 'DELETE') return deactivateUser(event, decodeURIComponent(userMatch[1]));
+  }
 
   return resp(404, { message: 'Not found' });
 }

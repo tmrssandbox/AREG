@@ -14,6 +14,7 @@ import * as apigwv2auth from 'aws-cdk-lib/aws-apigatewayv2-authorizers';
 import * as apigwv2int from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as eventtargets from 'aws-cdk-lib/aws-events-targets';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as path from 'path';
 import { Construct } from 'constructs';
 
@@ -165,9 +166,10 @@ export class AregStack extends cdk.Stack {
       handler:      'index.handler',
       code:         lambda.Code.fromAsset(path.join(__dirname, '../../lambda/dist')),
       environment: {
-        TABLE_APPS:  'areg-ddb-apps',
-        TABLE_AUDIT: 'areg-ddb-audit',
-        REGION:      this.region,
+        TABLE_APPS:   'areg-ddb-apps',
+        TABLE_AUDIT:  'areg-ddb-audit',
+        REGION:       this.region,
+        USER_POOL_ID: userPool.userPoolId,
       },
       timeout: cdk.Duration.seconds(29),
     });
@@ -175,6 +177,18 @@ export class AregStack extends cdk.Stack {
     // Grant Lambda read/write on both tables
     appsTable.grantReadWriteData(apiLambda);
     auditTable.grantReadWriteData(apiLambda);
+
+    // Grant Lambda Cognito admin permissions (AREG-21: user management)
+    apiLambda.addToRolePolicy(new iam.PolicyStatement({
+      actions: [
+        'cognito-idp:ListUsers',
+        'cognito-idp:AdminCreateUser',
+        'cognito-idp:AdminUpdateUserAttributes',
+        'cognito-idp:AdminDisableUser',
+        'cognito-idp:AdminEnableUser',
+      ],
+      resources: [userPool.userPoolArn],
+    }));
 
     const httpApi = new apigwv2.HttpApi(this, 'AregApigwApi', {
       apiName:     'areg-apigw-api',
@@ -221,6 +235,35 @@ export class AregStack extends cdk.Stack {
       description: 'Keep areg-lambda-api warm',
       schedule:    events.Schedule.rate(cdk.Duration.minutes(5)),
       targets:     [new eventtargets.LambdaFunction(apiLambda)],
+    });
+
+    // ── AREG-20: Renewal alerts Lambda ────────────────────────────────────────
+
+    const alertsLambda = new lambda.Function(this, 'AregLambdaRenewalAlerts', {
+      functionName: 'areg-lambda-renewal-alerts',
+      runtime:      lambda.Runtime.NODEJS_20_X,
+      handler:      'index.handler',
+      code:         lambda.Code.fromAsset(path.join(__dirname, '../../lambda-alerts/dist')),
+      environment: {
+        TABLE_APPS:   'areg-ddb-apps',
+        REGION:       this.region,
+        ALERT_SENDER: 'noreply@tmrs.studio',
+      },
+      timeout: cdk.Duration.seconds(60),
+    });
+
+    appsTable.grantReadData(alertsLambda);
+
+    alertsLambda.addToRolePolicy(new iam.PolicyStatement({
+      actions:   ['ses:SendEmail', 'ses:SendRawEmail'],
+      resources: [`arn:aws:ses:us-east-1:${this.account}:identity/tmrs.studio`],
+    }));
+
+    new events.Rule(this, 'AregEbRenewalAlertsDaily', {
+      ruleName:    'areg-eb-renewal-alerts-daily',
+      description: 'Daily renewal alert emails',
+      schedule:    events.Schedule.cron({ hour: '10', minute: '0' }),
+      targets:     [new eventtargets.LambdaFunction(alertsLambda)],
     });
 
     // Store API endpoint
