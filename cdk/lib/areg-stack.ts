@@ -45,7 +45,7 @@ export class AregStack extends cdk.Stack {
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
-    new dynamodb.Table(this, 'AregDdbAudit', {
+    const auditTable = new dynamodb.Table(this, 'AregDdbAudit', {
       tableName: 'areg-ddb-audit',
       partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
       sortKey:      { name: 'SK', type: dynamodb.AttributeType.STRING },
@@ -174,6 +174,7 @@ export class AregStack extends cdk.Stack {
 
     // Grant Lambda read/write on both tables
     appsTable.grantReadWriteData(apiLambda);
+    auditTable.grantReadWriteData(apiLambda);
 
     const httpApi = new apigwv2.HttpApi(this, 'AregApigwApi', {
       apiName:     'areg-apigw-api',
