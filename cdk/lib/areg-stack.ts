@@ -54,6 +54,10 @@ export class AregStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
+    // Opt into shared APPS backup plan (nightly, 30-day retention)
+    cdk.Tags.of(appsTable).add('ManagedBackup', 'true');
+    cdk.Tags.of(auditTable).add('ManagedBackup', 'true');
+
     // Export table names for Lambda env vars
     new ssm.StringParameter(this, 'TableAppsName', {
       parameterName: '/areg/table-apps',
@@ -171,7 +175,7 @@ export class AregStack extends cdk.Stack {
         TABLE_APPS:   'areg-ddb-apps',
         TABLE_AUDIT:  'areg-ddb-audit',
         REGION:       this.region,
-        USER_POOL_ID: userPool.userPoolId,
+        USER_POOL_ID: 'us-east-2_Ts0PtOaEc',  // stable — retained pool, see /areg/cognito-user-pool-id
       },
       timeout: cdk.Duration.seconds(29),
     });
@@ -180,7 +184,22 @@ export class AregStack extends cdk.Stack {
     appsTable.grantReadWriteData(apiLambda);
     auditTable.grantReadWriteData(apiLambda);
 
+    // Post-authentication trigger — records last sign-in timestamp to DynamoDB
+    userPool.addTrigger(cognito.UserPoolOperation.POST_AUTHENTICATION, apiLambda);
+
     // Grant Lambda Cognito admin permissions (AREG-21: user management)
+    // Use a constructed ARN (not userPool.userPoolArn) to avoid a circular
+    // dependency: userPool references apiLambda (trigger) and apiLambda
+    // references userPool (IAM policy) → CloudFormation rejects the cycle.
+    const userPoolArn = cdk.Arn.format({
+      partition: 'aws',
+      service: 'cognito-idp',
+      region: this.region,
+      account: this.account,
+      resource: 'userpool',
+      resourceName: 'us-east-2_Ts0PtOaEc',  // stable — retained pool, see /areg/cognito-user-pool-id
+      arnFormat: cdk.ArnFormat.SLASH_RESOURCE_NAME,
+    });
     apiLambda.addToRolePolicy(new iam.PolicyStatement({
       actions: [
         'cognito-idp:ListUsers',
@@ -189,7 +208,7 @@ export class AregStack extends cdk.Stack {
         'cognito-idp:AdminDisableUser',
         'cognito-idp:AdminEnableUser',
       ],
-      resources: [userPool.userPoolArn],
+      resources: [userPoolArn],
     }));
 
     const httpApi = new apigwv2.HttpApi(this, 'AregApigwApi', {
@@ -202,11 +221,12 @@ export class AregStack extends cdk.Stack {
       },
     });
 
+    // Literal IDs avoid circular dependency (User Pool ↔ Lambda trigger)
     const jwtAuthorizer = new apigwv2auth.HttpJwtAuthorizer(
       'AregCognitoJwtAuth',
-      `https://cognito-idp.${this.region}.amazonaws.com/${userPool.userPoolId}`,
+      'https://cognito-idp.us-east-2.amazonaws.com/us-east-2_Ts0PtOaEc',
       {
-        jwtAudience: [appClient.userPoolClientId],
+        jwtAudience: ['117u215jcpi0n2nsd4ud5fdn5j'],  // stable — retained app client, see /areg/cognito-app-client-id
         authorizerName: 'areg-cognito-jwt-auth',
       },
     );

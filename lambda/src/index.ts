@@ -1,17 +1,29 @@
 import { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2, ScheduledEvent } from 'aws-lambda';
-import { listApps }   from './handlers/listApps';
-import { getApp }     from './handlers/getApp';
-import { createApp }  from './handlers/createApp';
-import { updateApp }  from './handlers/updateApp';
+import { listApps }      from './handlers/listApps';
+import { getApp }        from './handlers/getApp';
+import { createApp }     from './handlers/createApp';
+import { updateApp }     from './handlers/updateApp';
 import { deleteApp, restoreApp } from './handlers/deleteApp';
-import { getAudit }   from './handlers/getAudit';
-import { importApps } from './handlers/importApps';
-import { listUsers, inviteUser, updateUserRole, deactivateUser, enableUser } from './handlers/users';
+import { getAudit }      from './handlers/getAudit';
+import { importApps }    from './handlers/importApps';
+import { listUsers, inviteUser, updateUserRole, deactivateUser, enableUser, recordSignIn } from './handlers/users';
+import { getSettings, putSettings } from './handlers/adminSettings';
 
-type LambdaEvent = APIGatewayProxyEventV2WithJWTAuthorizer | ScheduledEvent;
+// Cognito post-authentication trigger event shape
+interface CognitoPostAuthEvent {
+  triggerSource: string;
+  userName: string;
+  request: { userAttributes: Record<string, string> };
+}
+
+type LambdaEvent = APIGatewayProxyEventV2WithJWTAuthorizer | ScheduledEvent | CognitoPostAuthEvent;
 
 function isKeepWarm(event: LambdaEvent): boolean {
   return 'source' in event && (event as ScheduledEvent).source === 'aws.events';
+}
+
+function isCognitoTrigger(event: LambdaEvent): event is CognitoPostAuthEvent {
+  return 'triggerSource' in event;
 }
 
 function isApiEvent(event: LambdaEvent): event is APIGatewayProxyEventV2WithJWTAuthorizer {
@@ -22,7 +34,19 @@ function resp(statusCode: number, body: unknown): APIGatewayProxyResultV2 {
   return { statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
 }
 
-export async function handler(event: LambdaEvent): Promise<APIGatewayProxyResultV2 | void> {
+export async function handler(event: LambdaEvent): Promise<APIGatewayProxyResultV2 | LambdaEvent | void> {
+  // Cognito post-authentication trigger — record last sign-in and return event unchanged
+  if (isCognitoTrigger(event)) {
+    if (event.triggerSource === 'PostAuthentication_Authentication') {
+      try {
+        await recordSignIn(event.userName, event.request.userAttributes['email'] ?? '');
+      } catch (e) {
+        console.error('Failed to record sign-in:', e);
+      }
+    }
+    return event;
+  }
+
   if (isKeepWarm(event)) {
     console.log('Keep-warm ping received');
     return;
@@ -46,8 +70,12 @@ export async function handler(event: LambdaEvent): Promise<APIGatewayProxyResult
   if (method === 'POST' && path === '/apps')           return createApp(event);
 
   // Users routes (Admin only)
-  if (method === 'GET'  && path === '/users')          return listUsers(event);
-  if (method === 'POST' && path === '/users/invite')   return inviteUser(event);
+  if (method === 'GET'  && path === '/users')           return listUsers(event);
+  if (method === 'POST' && path === '/users/invite')    return inviteUser(event);
+
+  // Admin settings routes
+  if (method === 'GET'  && path === '/admin/settings') return getSettings(event);
+  if (method === 'PUT'  && path === '/admin/settings') return putSettings(event);
 
   // /apps/{id}
   const appMatch = path.match(/^\/apps\/([^/]+)$/);

@@ -7,13 +7,23 @@ import {
   AdminDisableUserCommand,
   AdminEnableUserCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
+import { BatchGetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { ddb, TABLE_APPS } from '../lib/dynamo';
 import { getCaller, requireAdmin } from '../lib/auth';
 import { ok, created, forbidden, badRequest } from '../lib/response';
 
 const cognitoClient = new CognitoIdentityProviderClient({ region: process.env.REGION ?? 'us-east-2' });
 const USER_POOL_ID  = process.env.USER_POOL_ID ?? '';
 
-function mapUser(u: { Username?: string; Enabled?: boolean; UserStatus?: string; UserCreateDate?: Date; Attributes?: { Name?: string; Value?: string }[] }) {
+type CognitoUserRecord = {
+  Username?: string;
+  Enabled?: boolean;
+  UserStatus?: string;
+  UserCreateDate?: Date;
+  Attributes?: { Name?: string; Value?: string }[];
+};
+
+function mapUser(u: CognitoUserRecord, lastSignIn: string | null = null) {
   const attrs = Object.fromEntries((u.Attributes ?? []).map(a => [a.Name ?? '', a.Value ?? '']));
   return {
     sub:       u.Username ?? '',           // Cognito Username — used for admin operations
@@ -22,7 +32,20 @@ function mapUser(u: { Username?: string; Enabled?: boolean; UserStatus?: string;
     status:    u.UserStatus,
     enabled:   u.Enabled ?? true,
     createdAt: u.UserCreateDate?.toISOString() ?? '',
+    lastSignIn,
   };
+}
+
+export async function recordSignIn(sub: string, email: string): Promise<void> {
+  await ddb.send(new PutCommand({
+    TableName: TABLE_APPS,
+    Item: {
+      PK:        `SIGNIN#${sub}`,
+      SK:        'LASTSIGNIN',
+      email,
+      timestamp: new Date().toISOString(),
+    },
+  }));
 }
 
 export async function listUsers(event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyResultV2> {
@@ -30,7 +53,26 @@ export async function listUsers(event: APIGatewayProxyEventV2WithJWTAuthorizer):
   if (!requireAdmin(caller)) return forbidden();
 
   const result = await cognitoClient.send(new ListUsersCommand({ UserPoolId: USER_POOL_ID }));
-  return ok({ users: (result.Users ?? []).map(mapUser) });
+  const cognitoUsers = result.Users ?? [];
+
+  // Fetch last sign-in times from DynamoDB (written by post-auth trigger)
+  const signInMap: Record<string, string> = {};
+  if (cognitoUsers.length > 0) {
+    const keys = cognitoUsers
+      .map(u => u.Username ?? '')
+      .filter(Boolean)
+      .map(username => ({ PK: `SIGNIN#${username}`, SK: 'LASTSIGNIN' }));
+
+    const batchResult = await ddb.send(new BatchGetCommand({
+      RequestItems: { [TABLE_APPS]: { Keys: keys } },
+    }));
+    for (const item of batchResult.Responses?.[TABLE_APPS] ?? []) {
+      const sub = (item['PK'] as string).replace('SIGNIN#', '');
+      signInMap[sub] = item['timestamp'] as string;
+    }
+  }
+
+  return ok({ users: cognitoUsers.map(u => mapUser(u, signInMap[u.Username ?? ''] ?? null)) });
 }
 
 export async function inviteUser(event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyResultV2> {
