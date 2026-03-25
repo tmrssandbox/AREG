@@ -4,11 +4,13 @@ import AppFooter from './AppFooter';
 import './Layout.css';
 
 const NAV = [
-  { path: '/',        label: 'Dashboard', adminOnly: false },
-  { path: '/catalog', label: 'Catalog',   adminOnly: false },
-  { path: '/archive', label: 'Archive',   adminOnly: true  },
-  { path: '/import',  label: 'Import',    adminOnly: true  },
-  { path: '/users',   label: 'Users',     adminOnly: true  },
+  { path: '/',        label: 'Dashboard',  adminOnly: false },
+  { path: '/catalog', label: 'Catalog',    adminOnly: false },
+  { path: '/archive', label: 'Archive',    adminOnly: true  },
+  { path: '/import',  label: 'Import',     adminOnly: true  },
+  { path: '/users',   label: 'Users',      adminOnly: true  },
+  { path: '/help',    label: 'Help',       adminOnly: false },
+  { path: '/profile', label: 'My Profile', adminOnly: false },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
