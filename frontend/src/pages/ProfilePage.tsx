@@ -1,17 +1,37 @@
-import { useState, FormEvent } from 'react';
-import { updatePassword } from 'aws-amplify/auth';
+import { useState, useEffect, FormEvent } from 'react';
+import { updatePassword, setUpTOTP, verifyTOTPSetup, updateMFAPreference, fetchMFAPreference } from 'aws-amplify/auth';
+import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../contexts/AuthContext';
 import './ProfilePage.css';
+
+type TotpStep = 'idle' | 'scan' | 'verify';
 
 export default function ProfilePage() {
   const { email, role } = useAuth();
 
+  // Change password
   const [oldPassword,     setOldPassword]     = useState('');
   const [newPassword,     setNewPassword]      = useState('');
   const [confirmPassword, setConfirmPassword]  = useState('');
   const [passwordMsg,     setPasswordMsg]      = useState('');
   const [passwordErr,     setPasswordErr]      = useState('');
-  const [busy,            setBusy]             = useState(false);
+  const [passwordBusy,    setPasswordBusy]     = useState(false);
+
+  // MFA
+  const [mfaEnabled,  setMfaEnabled]  = useState(false);
+  const [totpStep,    setTotpStep]    = useState<TotpStep>('idle');
+  const [totpUri,     setTotpUri]     = useState('');
+  const [totpSecret,  setTotpSecret]  = useState('');
+  const [totpCode,    setTotpCode]    = useState('');
+  const [mfaMsg,      setMfaMsg]      = useState('');
+  const [mfaErr,      setMfaErr]      = useState('');
+  const [mfaBusy,     setMfaBusy]     = useState(false);
+
+  useEffect(() => {
+    fetchMFAPreference()
+      .then(prefs => setMfaEnabled(prefs.preferred === 'TOTP' || (prefs.enabled?.includes('TOTP') ?? false)))
+      .catch(() => {});
+  }, []);
 
   async function handlePasswordChange(e: FormEvent) {
     e.preventDefault();
@@ -21,7 +41,7 @@ export default function ProfilePage() {
       setPasswordErr('Passwords do not match.');
       return;
     }
-    setBusy(true);
+    setPasswordBusy(true);
     try {
       await updatePassword({ oldPassword, newPassword });
       setPasswordMsg('Password updated.');
@@ -31,7 +51,59 @@ export default function ProfilePage() {
     } catch (err: unknown) {
       setPasswordErr(err instanceof Error ? err.message : 'Change failed.');
     } finally {
-      setBusy(false);
+      setPasswordBusy(false);
+    }
+  }
+
+  async function handleSetupTotp() {
+    setMfaErr('');
+    setMfaMsg('');
+    setMfaBusy(true);
+    try {
+      const setup = await setUpTOTP();
+      const secret = setup.sharedSecret;
+      const uri = setup.getSetupUri('AREG', email ?? undefined).toString();
+      setTotpSecret(secret);
+      setTotpUri(uri);
+      setTotpStep('scan');
+    } catch (err: unknown) {
+      setMfaErr(err instanceof Error ? err.message : 'Setup failed.');
+    } finally {
+      setMfaBusy(false);
+    }
+  }
+
+  async function handleVerifyTotp(e: FormEvent) {
+    e.preventDefault();
+    setMfaErr('');
+    setMfaMsg('');
+    setMfaBusy(true);
+    try {
+      await verifyTOTPSetup({ code: totpCode.trim() });
+      await updateMFAPreference({ totp: 'PREFERRED' });
+      setMfaEnabled(true);
+      setTotpStep('idle');
+      setTotpCode('');
+      setMfaMsg('Two-factor authentication enabled.');
+    } catch (err: unknown) {
+      setMfaErr(err instanceof Error ? err.message : 'Verification failed.');
+    } finally {
+      setMfaBusy(false);
+    }
+  }
+
+  async function handleDisableMfa() {
+    setMfaErr('');
+    setMfaMsg('');
+    setMfaBusy(true);
+    try {
+      await updateMFAPreference({ totp: 'NOT_PREFERRED' });
+      setMfaEnabled(false);
+      setMfaMsg('Two-factor authentication disabled.');
+    } catch (err: unknown) {
+      setMfaErr(err instanceof Error ? err.message : 'Failed to disable 2FA.');
+    } finally {
+      setMfaBusy(false);
     }
   }
 
@@ -39,6 +111,7 @@ export default function ProfilePage() {
     <div className="settings-page">
       <h1>My Profile</h1>
 
+      {/* Profile */}
       <section className="settings-section">
         <h2>Profile</h2>
         <p className="settings-desc">Your account is managed by your administrator.</p>
@@ -52,6 +125,7 @@ export default function ProfilePage() {
         </div>
       </section>
 
+      {/* Change password */}
       <section className="settings-section">
         <h2>Change password</h2>
         <form onSubmit={handlePasswordChange}>
@@ -59,39 +133,76 @@ export default function ProfilePage() {
           {passwordMsg && <div className="profile-success">{passwordMsg}</div>}
           <div className="settings-field">
             <label htmlFor="old-pw">Current password</label>
-            <input
-              id="old-pw"
-              type="password"
-              value={oldPassword}
-              onChange={e => setOldPassword(e.target.value)}
-              required
-            />
+            <input id="old-pw" type="password" value={oldPassword}
+              onChange={e => setOldPassword(e.target.value)} required />
           </div>
           <div className="settings-field">
             <label htmlFor="new-pw">New password</label>
-            <input
-              id="new-pw"
-              type="password"
-              value={newPassword}
-              onChange={e => setNewPassword(e.target.value)}
-              required
-              minLength={8}
-            />
+            <input id="new-pw" type="password" value={newPassword}
+              onChange={e => setNewPassword(e.target.value)} required minLength={8} />
           </div>
           <div className="settings-field">
             <label htmlFor="confirm-pw">Confirm new password</label>
-            <input
-              id="confirm-pw"
-              type="password"
-              value={confirmPassword}
-              onChange={e => setConfirmPassword(e.target.value)}
-              required
-            />
+            <input id="confirm-pw" type="password" value={confirmPassword}
+              onChange={e => setConfirmPassword(e.target.value)} required />
           </div>
-          <button type="submit" className="btn-save" disabled={busy}>
-            {busy ? 'Changing…' : 'Change password'}
+          <button type="submit" className="btn-save" disabled={passwordBusy}>
+            {passwordBusy ? 'Changing…' : 'Change password'}
           </button>
         </form>
+      </section>
+
+      {/* Two-factor authentication */}
+      <section className="settings-section">
+        <h2>Two-factor authentication</h2>
+        {mfaErr && <div className="profile-error">{mfaErr}</div>}
+        {mfaMsg && <div className="profile-success">{mfaMsg}</div>}
+
+        {mfaEnabled ? (
+          <>
+            <p className="settings-desc">
+              Two-factor authentication is <strong>enabled</strong>. You will be asked for a code
+              from your authenticator app on every sign in.
+            </p>
+            <button className="btn-danger" onClick={handleDisableMfa} disabled={mfaBusy}>
+              {mfaBusy ? 'Disabling…' : 'Disable 2FA'}
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="settings-desc">Add an extra layer of security using an authenticator app.</p>
+
+            {totpStep === 'idle' && (
+              <button className="btn-save" onClick={handleSetupTotp} disabled={mfaBusy}>
+                {mfaBusy ? 'Setting up…' : 'Set up authenticator'}
+              </button>
+            )}
+
+            {totpStep === 'scan' && (
+              <div className="mfa-setup">
+                <p className="settings-desc">
+                  Scan the QR code with Google Authenticator, Authy, or any TOTP app. Or enter
+                  the secret key manually.
+                </p>
+                <div className="mfa-qr">
+                  <QRCodeSVG value={totpUri} size={180} />
+                </div>
+                <code className="totp-secret">{totpSecret}</code>
+                <form onSubmit={handleVerifyTotp} className="mfa-verify-form">
+                  <div className="settings-field">
+                    <label htmlFor="totp-code">Enter the 6-digit code from your app to confirm</label>
+                    <input id="totp-code" type="text" value={totpCode}
+                      onChange={e => setTotpCode(e.target.value)}
+                      required maxLength={6} autoFocus inputMode="numeric" />
+                  </div>
+                  <button type="submit" className="btn-save" disabled={mfaBusy}>
+                    {mfaBusy ? 'Verifying…' : 'Verify and enable'}
+                  </button>
+                </form>
+              </div>
+            )}
+          </>
+        )}
       </section>
     </div>
   );

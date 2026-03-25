@@ -73,6 +73,8 @@ export class AregStack extends cdk.Stack {
         requireDigits: true,
         requireSymbols: false,
       },
+      mfa: cognito.Mfa.OPTIONAL,
+      mfaSecondFactor: { sms: false, otp: true },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
       customAttributes: {
         role: new cognito.StringAttribute({ mutable: true }),
