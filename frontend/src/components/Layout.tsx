@@ -1,21 +1,21 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import AppFooter from './AppFooter';
 import './Layout.css';
 
-const NAV = [
-  { path: '/',        label: 'Dashboard',  adminOnly: false },
-  { path: '/catalog', label: 'Catalog',    adminOnly: false },
-  { path: '/archive', label: 'Archive',    adminOnly: true  },
-  { path: '/import',  label: 'Import',     adminOnly: true  },
-  { path: '/users',   label: 'Users',      adminOnly: true  },
+const NAV_LEFT = [
+  { path: '/',        label: 'Dashboard', adminOnly: false, end: true },
+  { path: '/catalog', label: 'Catalog',   adminOnly: false, end: false },
+  { path: '/admin',   label: 'Admin',     adminOnly: true,  end: false },
+];
+
+const NAV_RIGHT = [
   { path: '/help',    label: 'Help',       adminOnly: false },
   { path: '/profile', label: 'My Profile', adminOnly: false },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { email, isAdmin, logout } = useAuth();
-  const location = useLocation();
   const navigate = useNavigate();
 
   async function handleLogout() {
@@ -23,41 +23,58 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     navigate('/login');
   }
 
+  const visibleLeft  = NAV_LEFT.filter(n => !n.adminOnly || isAdmin);
+  const visibleRight = NAV_RIGHT.filter(n => !n.adminOnly || isAdmin);
+
   return (
     <div className="app-shell">
-      <div className="app-body">
-        <aside className="sidebar">
-          <a href="https://apps.tmrs.studio/" target="_blank" rel="noopener noreferrer" className="sidebar-brand">
-            <img
-              src="/LogoAplicationRegistryWhiteBackground.png"
-              alt="Application Registry"
-              className="sidebar-brand-logo"
-            />
-            <span className="sidebar-brand-label">Application Registry</span>
-          </a>
+      <header className="topnav">
+        <div className="topnav-inner">
+          <div className="topnav-left">
+            <Link to="/" className="topnav-brand">
+              <img
+                src="/LogoApplicationRegistryWhiteBackground.png.png"
+                alt="Application Registry"
+                className="topnav-brand-logo"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            </Link>
 
-          <nav className="sidebar-nav">
-            {NAV.filter(n => !n.adminOnly || isAdmin).map(n => (
-              <Link
+            <nav className="topnav-nav">
+              {visibleLeft.map(n => (
+                <NavLink
+                  key={n.path}
+                  to={n.path}
+                  end={n.end}
+                  className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+                >
+                  {n.label}
+                </NavLink>
+              ))}
+            </nav>
+          </div>
+
+          <div className="topnav-right">
+            {visibleRight.map(n => (
+              <NavLink
                 key={n.path}
                 to={n.path}
-                className={`sidebar-link${location.pathname === n.path ? ' active' : ''}`}
+                className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
               >
                 {n.label}
-              </Link>
+              </NavLink>
             ))}
-          </nav>
-
-          <div className="sidebar-user">
-            <span className="sidebar-email">{email}</span>
-            <button onClick={handleLogout} className="sidebar-signout">Sign out</button>
+            <div className="topnav-user">
+              <span className="user-email">{email}</span>
+              <button onClick={handleLogout} className="signout-btn">Sign out</button>
+            </div>
           </div>
-        </aside>
+        </div>
+      </header>
 
-        <main className="main-content">
-          {children}
-        </main>
-      </div>
+      <main className="main-content">
+        {children}
+      </main>
 
       <AppFooter />
     </div>

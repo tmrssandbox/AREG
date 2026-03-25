@@ -4,9 +4,7 @@ import ProtectedRoute  from './components/ProtectedRoute';
 import LoginPage       from './pages/LoginPage';
 import DashboardPage   from './pages/DashboardPage';
 import CatalogPage     from './pages/CatalogPage';
-import ArchivePage     from './pages/ArchivePage';
-import ImportPage      from './pages/ImportPage';
-import UsersPage       from './pages/UsersPage';
+import AdminPage       from './pages/AdminPage';
 import ProfilePage     from './pages/ProfilePage';
 import HelpPage        from './pages/HelpPage';
 
@@ -22,14 +20,8 @@ export default function App() {
           <Route path="/catalog" element={
             <ProtectedRoute><CatalogPage /></ProtectedRoute>
           } />
-          <Route path="/archive" element={
-            <ProtectedRoute adminOnly><ArchivePage /></ProtectedRoute>
-          } />
-          <Route path="/import" element={
-            <ProtectedRoute adminOnly><ImportPage /></ProtectedRoute>
-          } />
-          <Route path="/users" element={
-            <ProtectedRoute adminOnly><UsersPage /></ProtectedRoute>
+          <Route path="/admin" element={
+            <ProtectedRoute adminOnly><AdminPage /></ProtectedRoute>
           } />
           <Route path="/profile" element={
             <ProtectedRoute><ProfilePage /></ProtectedRoute>
