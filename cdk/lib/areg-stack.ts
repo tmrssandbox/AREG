@@ -8,6 +8,13 @@ import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as route53targets from 'aws-cdk-lib/aws-route53-targets';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
+import * as apigwv2auth from 'aws-cdk-lib/aws-apigatewayv2-authorizers';
+import * as apigwv2int from 'aws-cdk-lib/aws-apigatewayv2-integrations';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as eventtargets from 'aws-cdk-lib/aws-events-targets';
+import * as path from 'path';
 import { Construct } from 'constructs';
 
 export class AregStack extends cdk.Stack {
@@ -150,10 +157,82 @@ export class AregStack extends cdk.Stack {
       stringValue: distribution.distributionId,
     });
 
+    // ── AREG-7: Lambda + API Gateway HTTP API ─────────────────────────────────
+
+    const apiLambda = new lambda.Function(this, 'AregLambdaApi', {
+      functionName: 'areg-lambda-api',
+      runtime:      lambda.Runtime.NODEJS_20_X,
+      handler:      'index.handler',
+      code:         lambda.Code.fromAsset(path.join(__dirname, '../../lambda/dist')),
+      environment: {
+        TABLE_APPS:  'areg-ddb-apps',
+        TABLE_AUDIT: 'areg-ddb-audit',
+        REGION:      this.region,
+      },
+      timeout: cdk.Duration.seconds(29),
+    });
+
+    // Grant Lambda read/write on both tables
+    appsTable.grantReadWriteData(apiLambda);
+
+    const httpApi = new apigwv2.HttpApi(this, 'AregApigwApi', {
+      apiName:     'areg-apigw-api',
+      description: 'AREG HTTP API',
+      corsPreflight: {
+        allowOrigins: ['https://areg.tmrs.studio'],
+        allowMethods: [apigwv2.CorsHttpMethod.ANY],
+        allowHeaders: ['Authorization', 'Content-Type'],
+      },
+    });
+
+    const jwtAuthorizer = new apigwv2auth.HttpJwtAuthorizer(
+      'AregCognitoJwtAuth',
+      `https://cognito-idp.${this.region}.amazonaws.com/${userPool.userPoolId}`,
+      {
+        jwtAudience: [appClient.userPoolClientId],
+        authorizerName: 'areg-cognito-jwt-auth',
+      },
+    );
+
+    const lambdaIntegration = new apigwv2int.HttpLambdaIntegration(
+      'AregLambdaIntegration',
+      apiLambda,
+    );
+
+    // GET /health — no auth
+    httpApi.addRoutes({
+      path:        '/health',
+      methods:     [apigwv2.HttpMethod.GET],
+      integration: lambdaIntegration,
+    });
+
+    // All other routes — Cognito JWT required
+    httpApi.addRoutes({
+      path:        '/{proxy+}',
+      methods:     [apigwv2.HttpMethod.ANY],
+      integration: lambdaIntegration,
+      authorizer:  jwtAuthorizer,
+    });
+
+    // EventBridge keep-warm rule (every 5 minutes)
+    new events.Rule(this, 'AregEbKeepWarm', {
+      ruleName:    'areg-eb-keep-warm',
+      description: 'Keep areg-lambda-api warm',
+      schedule:    events.Schedule.rate(cdk.Duration.minutes(5)),
+      targets:     [new eventtargets.LambdaFunction(apiLambda)],
+    });
+
+    // Store API endpoint
+    new ssm.StringParameter(this, 'ApiEndpoint', {
+      parameterName: '/areg/api-endpoint',
+      stringValue:   httpApi.apiEndpoint,
+    });
+
     // ── Outputs ───────────────────────────────────────────────────────────────
     new cdk.CfnOutput(this, 'UserPoolId',    { value: userPool.userPoolId });
     new cdk.CfnOutput(this, 'AppClientId',  { value: appClient.userPoolClientId });
     new cdk.CfnOutput(this, 'CfDomainName', { value: distribution.distributionDomainName });
     new cdk.CfnOutput(this, 'CfId',         { value: distribution.distributionId });
+    new cdk.CfnOutput(this, 'ApiUrl',       { value: httpApi.apiEndpoint });
   }
 }
