@@ -1,0 +1,2 @@
+name,description,vendor,itContact,businessOwner,hoursOfOperation,department,renewalDate,notes
+AREG_TEST_IMPORT,Smoke test import,TestVendor,it@test.local,owner@test.local,9-5 M-F,IT,2027-01-01,E2E fixture
