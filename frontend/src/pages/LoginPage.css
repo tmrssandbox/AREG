@@ -1,0 +1,154 @@
+/* Login page — matches AIK AuthCard design */
+
+.auth-page {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(160deg, #1a5fb4 0%, #0f4f99 40%, #0a3572 100%);
+}
+
+/* Header */
+.auth-header {
+  background: #ffffff;
+  box-shadow: var(--shadow-sm);
+  padding: 0 var(--space-6);
+  height: 64px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.auth-header__logo {
+  height: 36px;
+  width: auto;
+  display: block;
+}
+
+/* Main / Card */
+.auth-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--space-4);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 480px;
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-8);
+}
+
+/* Hero */
+.auth-hero {
+  text-align: center;
+  margin-bottom: var(--space-6);
+}
+
+.auth-hero__presents {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.auth-hero__name {
+  font-family: var(--font-heading);
+  font-size: 3.5rem;
+  font-weight: 700;
+  color: var(--color-text-heading);
+  margin: 0 0 var(--space-2);
+  line-height: 1.1;
+}
+
+.auth-hero__tagline {
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+/* Card title */
+.auth-card-title {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  color: var(--color-text-heading);
+  margin-bottom: var(--space-6);
+}
+
+/* Form */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.form-field label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.form-field input {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  color: var(--color-text);
+  background: var(--color-surface);
+  transition: border-color var(--transition);
+  width: 100%;
+}
+
+.form-field input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.btn-primary {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-primary);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition);
+  width: 100%;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error-msg {
+  background: var(--color-error-light);
+  color: var(--color-error);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 480px) {
+  .auth-header { padding: 0 var(--space-4); }
+  .auth-card { padding: var(--space-6) var(--space-5); border-radius: var(--radius-md); }
+  .auth-hero__name { font-size: 2.5rem; }
+}

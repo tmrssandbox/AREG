@@ -1,6 +1,8 @@
 import { useState, FormEvent } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import AppFooter from '../components/AppFooter';
+import './LoginPage.css';
 
 export default function LoginPage() {
   const { login, email, loading } = useAuth();
@@ -28,40 +30,59 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white rounded-xl shadow-md w-full max-w-sm p-8">
-        <h1 className="text-2xl font-bold text-indigo-700 mb-6">AREG Sign In</h1>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input
-              type="email"
-              value={email_}
-              onChange={e => setEmail(e.target.value)}
-              required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+    <div className="auth-page">
+      <header className="auth-header">
+        <a href="https://apps.tmrs.studio/" target="_blank" rel="noopener noreferrer">
+          <img
+            src="/tmrs-studios-logo.png"
+            alt="TMRS Studios"
+            className="auth-header__logo"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+        </a>
+      </header>
+
+      <main className="auth-main">
+        <div className="auth-card">
+          <div className="auth-hero">
+            <p className="auth-hero__presents">TMRS Studios presents</p>
+            <p className="auth-hero__name">AREG</p>
+            <p className="auth-hero__tagline">Application Registry — manage your enterprise application catalog.</p>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <button
-            type="submit"
-            disabled={busy}
-            className="w-full bg-indigo-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {busy ? 'Signing in…' : 'Sign In'}
-          </button>
-        </form>
-      </div>
+
+          <h1 className="auth-card-title">Sign in</h1>
+
+          <form className="auth-form" onSubmit={handleSubmit}>
+            {error && <div className="error-msg">{error}</div>}
+            <div className="form-field">
+              <label htmlFor="email">Email</label>
+              <input
+                id="email"
+                type="email"
+                value={email_}
+                onChange={e => setEmail(e.target.value)}
+                required
+                autoFocus
+              />
+            </div>
+            <div className="form-field">
+              <label htmlFor="password">Password</label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <button type="submit" className="btn-primary" disabled={busy}>
+              {busy ? 'Signing in…' : 'Sign In'}
+            </button>
+          </form>
+        </div>
+      </main>
+
+      <AppFooter />
     </div>
   );
 }

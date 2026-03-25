@@ -1,7 +1,29 @@
+@import './design/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 body {
-  @apply bg-gray-50 text-gray-900;
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-text-heading);
+}
+
+input, textarea, select, button {
+  font-family: var(--font-body);
 }
