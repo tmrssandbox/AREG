@@ -63,6 +63,46 @@
   color: var(--color-text);
 }
 
+/* Info icon with CSS tooltip */
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  cursor: help;
+  position: relative;
+  flex-shrink: 0;
+}
+.info-icon::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 220px;
+  background: var(--color-text);
+  color: white;
+  font-size: var(--text-xs);
+  font-weight: 400;
+  line-height: 1.4;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 10;
+  text-align: center;
+  white-space: normal;
+}
+.info-icon:hover::after { opacity: 1; }
+
 .settings-text-input {
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);

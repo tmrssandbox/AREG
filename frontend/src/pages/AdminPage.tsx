@@ -532,16 +532,14 @@ function SettingsSection() {
         <h2>Allowed Sign-up Domains</h2>
         <div className="settings-row">
           <label>
-            Permitted email domains
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', fontWeight: 400, marginLeft: 'var(--space-2)' }}>
-              — only users with these domains can be invited
-            </span>
+            Allowed sign-up domains
+            <span className="info-icon" data-tooltip="Only users with these email domains can register. Leave empty to allow all domains.">ℹ</span>
           </label>
           <div className="domain-tags">
             {domains.map(d => (
               <span key={d} className="domain-tag">
                 {d}
-                <button className="domain-tag-remove" onClick={() => removeDomain(d)} title="Remove">×</button>
+                <button className="domain-tag-remove" onClick={() => removeDomain(d)} title="Remove domain">🗑</button>
               </span>
             ))}
           </div>
