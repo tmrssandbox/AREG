@@ -68,7 +68,7 @@ export class AregStack extends cdk.Stack {
 
     const userPool = new cognito.UserPool(this, 'AregCognitoUsers', {
       userPoolName: 'areg-cognito-users',
-      selfSignUpEnabled: false,
+      selfSignUpEnabled: true,
       signInAliases: { email: true },
       autoVerify: { email: true },
       passwordPolicy: {
@@ -183,6 +183,9 @@ export class AregStack extends cdk.Stack {
     // Grant Lambda read/write on both tables
     appsTable.grantReadWriteData(apiLambda);
     auditTable.grantReadWriteData(apiLambda);
+
+    // Pre-signup trigger — enforces allowed_domains setting
+    userPool.addTrigger(cognito.UserPoolOperation.PRE_SIGN_UP, apiLambda);
 
     // Post-authentication trigger — records last sign-in timestamp to DynamoDB
     userPool.addTrigger(cognito.UserPoolOperation.POST_AUTHENTICATION, apiLambda);

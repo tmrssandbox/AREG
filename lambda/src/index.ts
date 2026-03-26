@@ -8,13 +8,19 @@ import { getAudit }      from './handlers/getAudit';
 import { importApps }    from './handlers/importApps';
 import { listUsers, inviteUser, updateUserRole, deactivateUser, enableUser, recordSignIn } from './handlers/users';
 import { getSettings, putSettings } from './handlers/adminSettings';
+import { preSignUp } from './handlers/preSignUp';
 
-// Cognito post-authentication trigger event shape
-interface CognitoPostAuthEvent {
+// Cognito trigger event shape (pre-signup and post-authentication)
+export interface CognitoTriggerEvent {
   triggerSource: string;
   userName: string;
   request: { userAttributes: Record<string, string> };
+  response: Record<string, unknown>;
+  [key: string]: unknown;
 }
+
+// Keep alias for existing usage
+type CognitoPostAuthEvent = CognitoTriggerEvent;
 
 type LambdaEvent = APIGatewayProxyEventV2WithJWTAuthorizer | ScheduledEvent | CognitoPostAuthEvent;
 
@@ -35,8 +41,11 @@ function resp(statusCode: number, body: unknown): APIGatewayProxyResultV2 {
 }
 
 export async function handler(event: LambdaEvent): Promise<APIGatewayProxyResultV2 | LambdaEvent | void> {
-  // Cognito post-authentication trigger — record last sign-in and return event unchanged
+  // Cognito triggers
   if (isCognitoTrigger(event)) {
+    if (event.triggerSource === 'PreSignUp_SignUp') {
+      return preSignUp(event);
+    }
     if (event.triggerSource === 'PostAuthentication_Authentication') {
       try {
         await recordSignIn(event.userName, event.request.userAttributes['email'] ?? '');
