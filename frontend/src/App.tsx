@@ -1,8 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute  from './components/ProtectedRoute';
-import LoginPage       from './pages/LoginPage';
-import DashboardPage   from './pages/DashboardPage';
+import LoginPage          from './pages/LoginPage';
+import SignUpPage         from './pages/SignUpPage';
+import VerifyEmailPage    from './pages/VerifyEmailPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import DashboardPage      from './pages/DashboardPage';
 import CatalogPage     from './pages/CatalogPage';
 import AdminPage       from './pages/AdminPage';
 import ProfilePage     from './pages/ProfilePage';
@@ -13,7 +16,10 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
+          <Route path="/login"            element={<LoginPage />} />
+          <Route path="/signup"           element={<SignUpPage />} />
+          <Route path="/verify"           element={<VerifyEmailPage />} />
+          <Route path="/forgot-password"  element={<ForgotPasswordPage />} />
           <Route path="/" element={
             <ProtectedRoute><DashboardPage /></ProtectedRoute>
           } />

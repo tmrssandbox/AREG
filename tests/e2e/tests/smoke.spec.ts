@@ -198,8 +198,10 @@ test('delete the test record', async () => {
 // ── Archive — restore record ──────────────────────────────────────────────────
 
 test('archive page shows deleted record and can restore', async () => {
-  await page.click('a[href="/archive"]');
-  await page.waitForURL('/archive');
+  await page.click('a[href="/admin"]');
+  await page.waitForURL('/admin');
+  // Archive is the default tab — click it to be explicit
+  await page.click('button:has-text("Archive")');
   // Count rows before restore (strict: use first matching row's button)
   const restoreBtn = page.locator(`tr:has-text("${APP_NAME}") button:has-text("Restore")`).first();
   await expect(restoreBtn).toBeVisible({ timeout: 10_000 });
@@ -226,8 +228,9 @@ test('cleanup: delete test record from catalog', async () => {
 // ── CSV Import ────────────────────────────────────────────────────────────────
 
 test('CSV import preview and commit', async () => {
-  await page.click('a[href="/import"]');
-  await page.waitForURL('/import');
+  await page.click('a[href="/admin"]');
+  await page.waitForURL('/admin');
+  await page.click('button:has-text("Import")');
 
   // Upload CSV fixture
   const csvPath = path.join(__dirname, '../fixtures/import.csv');
@@ -243,8 +246,8 @@ test('CSV import preview and commit', async () => {
   await expect(page.locator('text=Valid').first()).toBeVisible({ timeout: 10_000 });
   await expect(page.locator(`text=${IMPORT_NAME}`).first()).toBeVisible();
 
-  // Commit
-  await page.click('button:has-text("Import")');
+  // Commit — button text is "Import N valid record(s)"
+  await page.click('button:has-text("valid record")');
   await expect(page.locator('text=Import Complete').first()).toBeVisible({ timeout: 15_000 });
 
   // Verify at least 1 created
@@ -274,4 +277,34 @@ test('sign out redirects to login', async () => {
   await page.click('button:has-text("Sign out")');
   await page.waitForURL('/login', { timeout: 10_000 });
   await expect(page).toHaveURL('/login');
+});
+
+// ── Auth page links ───────────────────────────────────────────────────────────
+
+test('login page shows forgot password and create account links', async () => {
+  await page.goto('/login');
+  await expect(page.locator('a[href="/forgot-password"]')).toBeVisible();
+  await expect(page.locator('a[href="/signup"]')).toBeVisible();
+});
+
+test('sign-up page loads and shows registration form', async () => {
+  await page.goto('/signup');
+  await expect(page.locator('h1')).toContainText('Create account');
+  await expect(page.locator('input[type="email"]')).toBeVisible();
+  await expect(page.locator('input[type="password"]').first()).toBeVisible();
+  await expect(page.locator('a[href="/login"]')).toBeVisible();
+});
+
+test('forgot password page loads and shows request form', async () => {
+  await page.goto('/forgot-password');
+  await expect(page.locator('h1')).toContainText('Forgot password');
+  await expect(page.locator('input[type="email"]')).toBeVisible();
+  await expect(page.locator('a[href="/login"]')).toBeVisible();
+});
+
+test('verify email page loads and shows code form', async () => {
+  await page.goto('/verify');
+  await expect(page.locator('h1')).toContainText('Verify your email');
+  await expect(page.locator('input[placeholder="123456"]')).toBeVisible();
+  await expect(page.locator('a[href="/login"]')).toBeVisible();
 });

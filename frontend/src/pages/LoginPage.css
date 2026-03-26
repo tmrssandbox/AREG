@@ -156,6 +156,43 @@
   font-size: var(--text-sm);
 }
 
+.success-msg {
+  background: var(--color-success-light);
+  color: var(--color-success);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.btn-secondary {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+  width: 100%;
+}
+
+.btn-secondary:hover:not(:disabled) { background: var(--color-primary-light); }
+.btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.auth-links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.auth-links a {
+  color: var(--color-primary);
+}
+
 @media (max-width: 480px) {
   .auth-header { padding: 0 var(--space-4); }
   .auth-card { padding: var(--space-6) var(--space-5); border-radius: var(--radius-md); }

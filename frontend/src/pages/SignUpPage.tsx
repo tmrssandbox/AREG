@@ -1,36 +1,32 @@
 import { useState, FormEvent } from 'react';
-import { useNavigate, useLocation, Navigate, Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { Link, useNavigate } from 'react-router-dom';
+import { signUp } from 'aws-amplify/auth';
 import AppFooter from '../components/AppFooter';
 import './LoginPage.css';
 
-export default function LoginPage() {
-  const { login, email, loading } = useAuth();
+export default function SignUpPage() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const successMessage = (location.state as { message?: string })?.message;
-  const [email_,   setEmail]    = useState('');
+  const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
+  const [confirm,  setConfirm]  = useState('');
   const [error,    setError]    = useState('');
   const [busy,     setBusy]     = useState(false);
-
-  if (loading) return null;
-  if (email)   return <Navigate to="/" replace />;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError('');
+    if (password !== confirm) { setError('Passwords do not match'); return; }
+    if (password.length < 8)  { setError('Password must be at least 8 characters'); return; }
     setBusy(true);
     try {
-      await login(email_, password);
-      navigate('/');
+      await signUp({
+        username: email.trim().toLowerCase(),
+        password,
+        options: { userAttributes: { email: email.trim().toLowerCase() } },
+      });
+      navigate('/verify', { state: { email: email.trim().toLowerCase() } });
     } catch (err) {
-      const msg = (err as Error).message ?? 'Login failed';
-      if (msg.includes('not confirmed') || msg.includes('UserNotConfirmedException')) {
-        navigate('/verify', { state: { email: email_.trim().toLowerCase() } });
-      } else {
-        setError(msg);
-      }
+      setError((err as Error).message ?? 'Sign up failed');
     } finally {
       setBusy(false);
     }
@@ -51,29 +47,15 @@ export default function LoginPage() {
 
       <main className="auth-main">
         <div className="auth-card">
-          <div className="auth-hero">
-            <p className="auth-hero__presents">TMRS Studios presents:</p>
-            <img
-              src="/LogoApplicationRegistryWhiteBackground.png.png"
-              alt="Application Registry"
-              className="auth-hero__logo"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
-            <p className="auth-hero__name">Application Registry</p>
-            <p className="auth-hero__tagline">Manage your enterprise application catalog.</p>
-          </div>
-
-          <h1 className="auth-card-title">Sign in</h1>
-
+          <h1 className="auth-card-title">Create account</h1>
           <form className="auth-form" onSubmit={handleSubmit}>
-            {successMessage && <div className="success-msg">{successMessage}</div>}
             {error && <div className="error-msg">{error}</div>}
             <div className="form-field">
               <label htmlFor="email">Email</label>
               <input
                 id="email"
                 type="email"
-                value={email_}
+                value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
                 autoFocus
@@ -87,15 +69,25 @@ export default function LoginPage() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
+                minLength={8}
+              />
+            </div>
+            <div className="form-field">
+              <label htmlFor="confirm">Confirm password</label>
+              <input
+                id="confirm"
+                type="password"
+                value={confirm}
+                onChange={e => setConfirm(e.target.value)}
+                required
               />
             </div>
             <button type="submit" className="btn-primary" disabled={busy}>
-              {busy ? 'Signing in…' : 'Sign In'}
+              {busy ? 'Creating account…' : 'Create account'}
             </button>
           </form>
           <div className="auth-links">
-            <Link to="/forgot-password">Forgot password?</Link>
-            <span>No account? <Link to="/signup">Create one</Link></span>
+            <span>Already have an account? <Link to="/login">Sign in</Link></span>
           </div>
         </div>
       </main>
