@@ -6,7 +6,7 @@ import { updateApp }     from './handlers/updateApp';
 import { deleteApp, restoreApp } from './handlers/deleteApp';
 import { getAudit }      from './handlers/getAudit';
 import { importApps }    from './handlers/importApps';
-import { listUsers, inviteUser, deactivateUser, enableUser, recordSignIn } from './handlers/users';
+import { recordSignIn } from './handlers/users';
 import { preSignUp } from './handlers/preSignUp';
 
 // Cognito trigger event shape (pre-signup and post-authentication)
@@ -82,10 +82,6 @@ export async function handler(event: LambdaEvent): Promise<APIGatewayProxyResult
   if (method === 'POST' && path === '/apps/import')    return importApps(event);
   if (method === 'POST' && path === '/apps')           return createApp(event);
 
-  // Users routes (Admin only)
-  if (method === 'GET'  && path === '/users')           return listUsers(event);
-  if (method === 'POST' && path === '/users/invite')    return inviteUser(event);
-
   // /apps/{id}
   const appMatch = path.match(/^\/apps\/([^/]+)$/);
   if (appMatch) {
@@ -102,16 +98,6 @@ export async function handler(event: LambdaEvent): Promise<APIGatewayProxyResult
   // /audit/{appId}
   const auditMatch = path.match(/^\/audit\/([^/]+)$/);
   if (auditMatch && method === 'GET') return getAudit(event, auditMatch[1]);
-
-  // /users/{username}/enable
-  const userEnableMatch = path.match(/^\/users\/([^/]+)\/enable$/);
-  if (userEnableMatch && method === 'POST') return enableUser(event, decodeURIComponent(userEnableMatch[1]));
-
-  // /users/{username}
-  const userMatch = path.match(/^\/users\/([^/]+)$/);
-  if (userMatch) {
-    if (method === 'DELETE') return deactivateUser(event, decodeURIComponent(userMatch[1]));
-  }
 
   return resp(404, { message: 'Not found' });
 }

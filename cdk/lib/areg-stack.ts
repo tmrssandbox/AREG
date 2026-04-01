@@ -193,31 +193,6 @@ export class AregStack extends cdk.Stack {
     // Post-authentication trigger — records last sign-in timestamp to DynamoDB
     userPool.addTrigger(cognito.UserPoolOperation.POST_AUTHENTICATION, apiLambda);
 
-    // Grant Lambda Cognito admin permissions (AREG-21: user management)
-    // Use a constructed ARN (not userPool.userPoolArn) to avoid a circular
-    // dependency: userPool references apiLambda (trigger) and apiLambda
-    // references userPool (IAM policy) → CloudFormation rejects the cycle.
-    const userPoolArn = cdk.Arn.format({
-      partition: 'aws',
-      service: 'cognito-idp',
-      region: this.region,
-      account: this.account,
-      resource: 'userpool',
-      resourceName: 'us-east-2_Ts0PtOaEc',  // stable — retained pool, see /areg/cognito-user-pool-id
-      arnFormat: cdk.ArnFormat.SLASH_RESOURCE_NAME,
-    });
-    apiLambda.addToRolePolicy(new iam.PolicyStatement({
-      actions: [
-        'cognito-idp:ListUsers',
-        'cognito-idp:AdminCreateUser',
-        'cognito-idp:AdminAddUserToGroup',
-        'cognito-idp:AdminListGroupsForUser',
-        'cognito-idp:AdminDisableUser',
-        'cognito-idp:AdminEnableUser',
-      ],
-      resources: [userPoolArn],
-    }));
-
     // Role groups (admin, editor, viewer) exist in AREG Cognito pool — created once via CLI,
     // not managed by CDK to avoid re-creation conflicts on existing pools.
 
