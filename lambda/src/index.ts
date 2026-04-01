@@ -7,7 +7,6 @@ import { deleteApp, restoreApp } from './handlers/deleteApp';
 import { getAudit }      from './handlers/getAudit';
 import { importApps }    from './handlers/importApps';
 import { listUsers, inviteUser, deactivateUser, enableUser, recordSignIn } from './handlers/users';
-import { getSettings, putSettings } from './handlers/adminSettings';
 import { preSignUp } from './handlers/preSignUp';
 
 // Cognito trigger event shape (pre-signup and post-authentication)
@@ -86,10 +85,6 @@ export async function handler(event: LambdaEvent): Promise<APIGatewayProxyResult
   // Users routes (Admin only)
   if (method === 'GET'  && path === '/users')           return listUsers(event);
   if (method === 'POST' && path === '/users/invite')    return inviteUser(event);
-
-  // Admin settings routes
-  if (method === 'GET'  && path === '/admin/settings') return getSettings(event);
-  if (method === 'PUT'  && path === '/admin/settings') return putSettings(event);
 
   // /apps/{id}
   const appMatch = path.match(/^\/apps\/([^/]+)$/);

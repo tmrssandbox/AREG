@@ -35,7 +35,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const user = await getCurrentUser();
       const session = await fetchAuthSession();
       const claims = session.tokens?.idToken?.payload ?? {};
-      const role = (claims['custom:role'] as string | undefined) ?? 'viewer';
+      // Read role from Cognito group membership (set by ADMIN tool since ADMIN-35).
+      // Amplify returns cognito:groups as a string array; API GW serialises it as "[group]" — handle both.
+      const groupsRaw = claims['cognito:groups'] as string[] | string | undefined;
+      const groups = Array.isArray(groupsRaw)
+        ? groupsRaw
+        : (typeof groupsRaw === 'string' ? groupsRaw.replace(/^\[|\]$/g, '').split(' ').filter(Boolean) : []);
+      const role = (groups[0] as Role | undefined) ?? 'viewer';
       const name = (claims['name'] as string | undefined) ?? null;
       const idToken = session.tokens?.idToken?.toString() ?? null;
       setState({ loading: false, email: user.signInDetails?.loginId ?? null, name, role: role as Role, idToken });
