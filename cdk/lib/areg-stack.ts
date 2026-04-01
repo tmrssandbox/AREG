@@ -16,6 +16,7 @@ import * as events from 'aws-cdk-lib/aws-events';
 import * as eventtargets from 'aws-cdk-lib/aws-events-targets';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as path from 'path';
+import { execSync } from 'child_process';
 import { Construct } from 'constructs';
 
 export class AregStack extends cdk.Stack {
@@ -177,6 +178,7 @@ export class AregStack extends cdk.Stack {
         ADMIN_APPS_TABLE:  'tmrs-admin-ddb-apps',
         REGION:            this.region,
         USER_POOL_ID:      'us-east-2_Ts0PtOaEc',  // stable — retained pool, see /areg/cognito-user-pool-id
+        DEPLOY_VERSION:    execSync('git rev-parse --short HEAD').toString().trim(),
       },
       timeout: cdk.Duration.seconds(29),
     });
@@ -249,6 +251,13 @@ export class AregStack extends cdk.Stack {
     // GET /health — no auth
     httpApi.addRoutes({
       path:        '/health',
+      methods:     [apigwv2.HttpMethod.GET],
+      integration: lambdaIntegration,
+    });
+
+    // GET /version — no auth
+    httpApi.addRoutes({
+      path:        '/version',
       methods:     [apigwv2.HttpMethod.GET],
       integration: lambdaIntegration,
     });

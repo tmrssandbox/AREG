@@ -72,6 +72,11 @@ export async function handler(event: LambdaEvent): Promise<APIGatewayProxyResult
     return resp(200, { status: 'ok' });
   }
 
+  // Version — no auth required
+  if (method === 'GET' && path === '/version') {
+    return resp(200, { version: process.env.DEPLOY_VERSION ?? 'unknown' });
+  }
+
   // Apps routes
   if (method === 'GET'  && path === '/apps')           return listApps(event);
   if (method === 'GET'  && path === '/apps/archived')  return listApps({ ...event, queryStringParameters: { ...event.queryStringParameters, status: 'deleted' } });

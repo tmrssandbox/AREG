@@ -29,3 +29,19 @@
 .help-section p:last-child {
   margin-bottom: 0;
 }
+
+.help-notice {
+  border-color: var(--color-warning, #f59e0b);
+  background: var(--color-warning-bg, #fffbeb);
+}
+
+.help-notice p {
+  color: var(--color-text, inherit);
+  font-weight: 500;
+}
+
+.help-version {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-top: var(--space-4);
+}
