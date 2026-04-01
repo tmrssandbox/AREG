@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { updatePassword, setUpTOTP, verifyTOTPSetup, updateMFAPreference, fetchMFAPreference, deleteUser } from 'aws-amplify/auth';
+import { updatePassword, updateUserAttributes, setUpTOTP, verifyTOTPSetup, updateMFAPreference, fetchMFAPreference, deleteUser } from 'aws-amplify/auth';
 import { QRCodeSVG } from 'qrcode.react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,8 +8,14 @@ import './ProfilePage.css';
 type TotpStep = 'idle' | 'scan' | 'verify';
 
 export default function ProfilePage() {
-  const { email, role, logout } = useAuth();
+  const { email, name: currentName, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
+
+  // Profile
+  const [name,        setName]        = useState(currentName ?? '');
+  const [profileMsg,  setProfileMsg]  = useState('');
+  const [profileErr,  setProfileErr]  = useState('');
+  const [profileBusy, setProfileBusy] = useState(false);
 
   // Change password
   const [oldPassword,     setOldPassword]     = useState('');
@@ -39,6 +45,22 @@ export default function ProfilePage() {
       .then(prefs => setMfaEnabled(prefs.preferred === 'TOTP' || (prefs.enabled?.includes('TOTP') ?? false)))
       .catch(() => {});
   }, []);
+
+  async function handleProfileSave(e: FormEvent) {
+    e.preventDefault();
+    setProfileErr('');
+    setProfileMsg('');
+    setProfileBusy(true);
+    try {
+      await updateUserAttributes({ userAttributes: { name } });
+      await refreshUser();
+      setProfileMsg('Profile updated.');
+    } catch (err: unknown) {
+      setProfileErr(err instanceof Error ? err.message : 'Update failed.');
+    } finally {
+      setProfileBusy(false);
+    }
+  }
 
   async function handlePasswordChange(e: FormEvent) {
     e.preventDefault();
@@ -135,23 +157,30 @@ export default function ProfilePage() {
       {/* Profile */}
       <section className="settings-section">
         <h2>Profile</h2>
-        <p className="settings-desc">Your account is managed by your administrator.</p>
-        <div className="settings-field">
-          <label>Email</label>
-          <input type="email" value={email ?? ''} disabled />
-        </div>
-        <div className="settings-field">
-          <label>Role</label>
-          <input type="text" value={role} disabled />
-        </div>
+        <form onSubmit={handleProfileSave}>
+          {profileErr && <div className="error-msg">{profileErr}</div>}
+          {profileMsg && <div className="success-msg">{profileMsg}</div>}
+          <div className="settings-field">
+            <label>Email</label>
+            <input type="email" value={email ?? ''} disabled />
+          </div>
+          <div className="settings-field">
+            <label htmlFor="display-name">Display name</label>
+            <input id="display-name" type="text" value={name}
+              onChange={e => setName(e.target.value)} placeholder="Your name" />
+          </div>
+          <button type="submit" className="btn-save" disabled={profileBusy}>
+            {profileBusy ? 'Saving…' : 'Save profile'}
+          </button>
+        </form>
       </section>
 
       {/* Change password */}
       <section className="settings-section">
         <h2>Change password</h2>
         <form onSubmit={handlePasswordChange}>
-          {passwordErr && <div className="profile-error">{passwordErr}</div>}
-          {passwordMsg && <div className="profile-success">{passwordMsg}</div>}
+          {passwordErr && <div className="error-msg">{passwordErr}</div>}
+          {passwordMsg && <div className="success-msg">{passwordMsg}</div>}
           <div className="settings-field">
             <label htmlFor="old-pw">Current password</label>
             <input id="old-pw" type="password" value={oldPassword}
@@ -176,8 +205,8 @@ export default function ProfilePage() {
       {/* Two-factor authentication */}
       <section className="settings-section">
         <h2>Two-factor authentication</h2>
-        {mfaErr && <div className="profile-error">{mfaErr}</div>}
-        {mfaMsg && <div className="profile-success">{mfaMsg}</div>}
+        {mfaErr && <div className="error-msg">{mfaErr}</div>}
+        {mfaMsg && <div className="success-msg">{mfaMsg}</div>}
 
         {mfaEnabled ? (
           <>
@@ -231,7 +260,7 @@ export default function ProfilePage() {
         <p className="settings-desc">
           Permanently delete your account. This cannot be undone.
         </p>
-        {deleteErr && <div className="profile-error">{deleteErr}</div>}
+        {deleteErr && <div className="error-msg">{deleteErr}</div>}
         <div className="settings-field">
           <label htmlFor="delete-confirm">
             Type your email to confirm: <strong>{email}</strong>

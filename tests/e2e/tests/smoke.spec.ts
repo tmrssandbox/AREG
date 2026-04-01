@@ -76,10 +76,27 @@ test('login redirects to dashboard', async () => {
   await expect(page).toHaveURL('/');
 });
 
+// ── Profile page ──────────────────────────────────────────────────────────────
+
+test('profile page loads with email and display name field', async () => {
+  await page.goto('/profile');
+  await expect(page.locator('h1')).toContainText('My Profile');
+  await expect(page.locator('input[type="email"][disabled]')).toBeVisible();
+  await expect(page.locator('#display-name')).toBeVisible();
+  // Role field should not be present
+  await expect(page.locator('label:has-text("Role")')).not.toBeVisible();
+});
+
+test('profile page can save display name', async () => {
+  await page.fill('#display-name', 'Smoke Test User');
+  await page.click('button:has-text("Save profile")');
+  await expect(page.locator('text=Profile updated.')).toBeVisible({ timeout: 10_000 });
+});
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
 test('dashboard displays stat cards', async () => {
-  // Already on / after login; wait for data to load
+  await page.goto('/');
   await page.waitForLoadState('networkidle', { timeout: 15_000 });
   // Stat cards should be visible once data loads
   await expect(page.locator('text=Total Apps')).toBeVisible({ timeout: 15_000 });
@@ -99,8 +116,8 @@ test('add new application record', async () => {
   // Open the add modal
   await page.click('button:has-text("Add App")');
 
-  // Wait for the modal overlay (.fixed) to appear
-  const modal = page.locator('.fixed');
+  // Wait for the modal overlay (.modal-overlay) to appear
+  const modal = page.locator('.modal-overlay');
   await modal.waitFor({ timeout: 5_000 });
   await expect(modal.locator('h2')).toContainText('Add Application');
 
@@ -154,44 +171,44 @@ test('edit the test record', async () => {
   await page.locator(`tr:has-text("${APP_NAME}")`).first().click();
 
   // Detail modal opens — click Edit
-  const modal = page.locator('.fixed');
+  const modal = page.locator('.modal-overlay');
   await expect(modal.locator('button:has-text("Edit")')).toBeVisible({ timeout: 5_000 });
   await modal.locator('button:has-text("Edit")').click();
 
   // Now shows AppFormModal for editing — notes is textareas.nth(1)
-  const editModal = page.locator('.fixed');
+  const editModal = page.locator('.modal-overlay');
   await expect(editModal.locator('h2')).toContainText('Edit Application', { timeout: 5_000 });
   await editModal.locator('textarea').nth(1).fill('Updated by E2E smoke test');
   await editModal.locator('button[type="submit"]').click();
   // Wait for modal to close
-  await expect(page.locator('.fixed')).not.toBeVisible({ timeout: 8_000 });
+  await expect(page.locator('.modal-overlay')).not.toBeVisible({ timeout: 8_000 });
 });
 
 // ── Audit log ─────────────────────────────────────────────────────────────────
 
 test('audit log shows update event', async () => {
   await page.locator(`tr:has-text("${APP_NAME}")`).first().click();
-  const modal = page.locator('.fixed');
+  const modal = page.locator('.modal-overlay');
   const auditTab = modal.locator('button:has-text("Audit")');
   await expect(auditTab).toBeVisible({ timeout: 5_000 });
   await auditTab.click();
   await expect(modal.locator('text=UPDATE').first()).toBeVisible({ timeout: 8_000 });
   // Close modal and wait for it to disappear
   await modal.locator('button:has-text("×")').click();
-  await expect(page.locator('.fixed')).not.toBeVisible({ timeout: 5_000 });
+  await expect(page.locator('.modal-overlay')).not.toBeVisible({ timeout: 5_000 });
 });
 
 // ── Delete record ─────────────────────────────────────────────────────────────
 
 test('delete the test record', async () => {
   await page.locator(`tr:has-text("${APP_NAME}")`).first().click();
-  const modal = page.locator('.fixed');
+  const modal = page.locator('.modal-overlay');
   await expect(modal.locator('button:has-text("Delete")')).toBeVisible({ timeout: 5_000 });
   await modal.locator('button:has-text("Delete")').click();
   // Confirm button appears
   await expect(modal.locator('button:has-text("Confirm Delete")')).toBeVisible({ timeout: 3_000 });
   await modal.locator('button:has-text("Confirm Delete")').click();
-  await expect(page.locator('.fixed')).not.toBeVisible({ timeout: 8_000 });
+  await expect(page.locator('.modal-overlay')).not.toBeVisible({ timeout: 8_000 });
   await expect(page.locator(`tr:has-text("${APP_NAME}")`)).not.toBeVisible({ timeout: 5_000 });
 });
 
@@ -217,12 +234,12 @@ test('cleanup: delete test record from catalog', async () => {
   await page.goto('/catalog');
   await page.waitForSelector(`tr:has-text("${APP_NAME}")`, { timeout: 10_000 });
   await page.locator(`tr:has-text("${APP_NAME}")`).first().click();
-  const modal = page.locator('.fixed');
+  const modal = page.locator('.modal-overlay');
   await expect(modal.locator('button:has-text("Delete")')).toBeVisible({ timeout: 5_000 });
   await modal.locator('button:has-text("Delete")').click();
   await expect(modal.locator('button:has-text("Confirm Delete")')).toBeVisible({ timeout: 3_000 });
   await modal.locator('button:has-text("Confirm Delete")').click();
-  await expect(page.locator('.fixed')).not.toBeVisible({ timeout: 8_000 });
+  await expect(page.locator('.modal-overlay')).not.toBeVisible({ timeout: 8_000 });
 });
 
 // ── CSV Import ────────────────────────────────────────────────────────────────
