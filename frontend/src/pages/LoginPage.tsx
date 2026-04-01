@@ -55,11 +55,11 @@ export default function LoginPage() {
             <p className="auth-hero__presents">TMRS Studios presents:</p>
             <img
               src="/LogoApplicationRegistryWhiteBackground.png"
-              alt="Application Registry"
+              alt="App Registry"
               className="auth-hero__logo"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
-            <p className="auth-hero__name">Application Registry</p>
+            <p className="auth-hero__name">App Registry</p>
             <p className="auth-hero__tagline">Manage your enterprise application catalog.</p>
           </div>
 

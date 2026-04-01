@@ -24,9 +24,9 @@ export default function HelpPage() {
       </div>
 
       <div className="help-section">
-        <h2>About Application Registry</h2>
+        <h2>About App Registry</h2>
         <p>
-          Application Registry is a tool for capturing and managing a basic inventory of products
+          App Registry is a tool for capturing and managing a basic inventory of products
           in use, including internal business owner and technical contacts, service hours and
           expected availability during those hours, vendor and contract renewal information, rough
           estimates on feature utilization, and criticality to business. This tool provides an easy

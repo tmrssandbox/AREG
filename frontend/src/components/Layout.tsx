@@ -34,11 +34,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Link to="/" className="topnav-brand">
               <img
                 src="/LogoApplicationRegistryWhiteBackground.png"
-                alt="Application Registry"
+                alt="App Registry"
                 className="topnav-brand-logo"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
-              <span className="topnav-brand-name">Application Registry</span>
+              <span className="topnav-brand-name">App Registry</span>
             </Link>
 
             <nav className="topnav-nav">
