@@ -65,15 +65,6 @@ export default function UsersPage() {
     finally { setInviting(false); }
   }
 
-  async function changeRole(sub: string, role: string) {
-    setError(''); setSuccess('');
-    try {
-      await apiFetch(`/users/${sub}`, { method: 'PUT', body: JSON.stringify({ role }) });
-      setSuccess('Role updated');
-      await load();
-    } catch (e) { setError((e as Error).message); }
-  }
-
   async function toggleEnabled(user: User) {
     setError(''); setSuccess('');
     try {
@@ -94,6 +85,7 @@ export default function UsersPage() {
     editor: 'bg-blue-100 text-blue-700',
     viewer: 'bg-gray-100 text-gray-600',
   };
+  // ADMIN-35: role management moved to admin.tmrs.studio
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -149,13 +141,9 @@ export default function UsersPage() {
                 <tr key={u.sub} className="border-b border-gray-50 last:border-0">
                   <td className="px-4 py-3 font-medium text-gray-800">{u.email}</td>
                   <td className="px-4 py-3">
-                    <select
-                      value={u.role}
-                      onChange={e => changeRole(u.sub, e.target.value)}
-                      className={`text-xs font-medium px-2 py-0.5 rounded-full border-0 cursor-pointer ${ROLE_COLORS[u.role] ?? 'bg-gray-100 text-gray-600'}`}
-                    >
-                      {ROLES.map(r => <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
-                    </select>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ROLE_COLORS[u.role] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${u.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>

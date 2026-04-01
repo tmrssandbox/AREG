@@ -3,7 +3,8 @@ import {
   CognitoIdentityProviderClient,
   ListUsersCommand,
   AdminCreateUserCommand,
-  AdminUpdateUserAttributesCommand,
+  AdminAddUserToGroupCommand,
+  AdminListGroupsForUserCommand,
   AdminDisableUserCommand,
   AdminEnableUserCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
@@ -23,12 +24,12 @@ type CognitoUserRecord = {
   Attributes?: { Name?: string; Value?: string }[];
 };
 
-function mapUser(u: CognitoUserRecord, lastSignIn: string | null = null) {
+function mapUser(u: CognitoUserRecord, role: string = 'viewer', lastSignIn: string | null = null) {
   const attrs = Object.fromEntries((u.Attributes ?? []).map(a => [a.Name ?? '', a.Value ?? '']));
   return {
     sub:       u.Username ?? '',           // Cognito Username — used for admin operations
     email:     attrs['email'] ?? u.Username ?? '',
-    role:      attrs['custom:role'] ?? 'viewer',
+    role,
     status:    u.UserStatus,
     enabled:   u.Enabled ?? true,
     createdAt: u.UserCreateDate?.toISOString() ?? '',
@@ -55,24 +56,34 @@ export async function listUsers(event: APIGatewayProxyEventV2WithJWTAuthorizer):
   const result = await cognitoClient.send(new ListUsersCommand({ UserPoolId: USER_POOL_ID }));
   const cognitoUsers = result.Users ?? [];
 
-  // Fetch last sign-in times from DynamoDB (written by post-auth trigger)
-  const signInMap: Record<string, string> = {};
-  if (cognitoUsers.length > 0) {
-    const keys = cognitoUsers
-      .map(u => u.Username ?? '')
-      .filter(Boolean)
-      .map(username => ({ PK: `SIGNIN#${username}`, SK: 'LASTSIGNIN' }));
+  // Fetch group membership and last sign-in times in parallel
+  const [groupsPerUser, signInMap] = await Promise.all([
+    Promise.all(
+      cognitoUsers.map(u =>
+        cognitoClient.send(new AdminListGroupsForUserCommand({ UserPoolId: USER_POOL_ID, Username: u.Username ?? '' }))
+          .then(r => (r.Groups ?? []).map(g => g.GroupName ?? ''))
+          .catch(() => [] as string[])
+      )
+    ),
+    (async () => {
+      const map: Record<string, string> = {};
+      if (cognitoUsers.length === 0) return map;
+      const keys = cognitoUsers
+        .map(u => u.Username ?? '')
+        .filter(Boolean)
+        .map(username => ({ PK: `SIGNIN#${username}`, SK: 'LASTSIGNIN' }));
+      const batchResult = await ddb.send(new BatchGetCommand({
+        RequestItems: { [TABLE_APPS]: { Keys: keys } },
+      }));
+      for (const item of batchResult.Responses?.[TABLE_APPS] ?? []) {
+        const sub = (item['PK'] as string).replace('SIGNIN#', '');
+        map[sub] = item['timestamp'] as string;
+      }
+      return map;
+    })(),
+  ]);
 
-    const batchResult = await ddb.send(new BatchGetCommand({
-      RequestItems: { [TABLE_APPS]: { Keys: keys } },
-    }));
-    for (const item of batchResult.Responses?.[TABLE_APPS] ?? []) {
-      const sub = (item['PK'] as string).replace('SIGNIN#', '');
-      signInMap[sub] = item['timestamp'] as string;
-    }
-  }
-
-  return ok({ users: cognitoUsers.map(u => mapUser(u, signInMap[u.Username ?? ''] ?? null)) });
+  return ok({ users: cognitoUsers.map((u, i) => mapUser(u, groupsPerUser[i][0] ?? 'viewer', signInMap[u.Username ?? ''] ?? null)) });
 }
 
 export async function inviteUser(event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyResultV2> {
@@ -90,32 +101,17 @@ export async function inviteUser(event: APIGatewayProxyEventV2WithJWTAuthorizer)
     UserAttributes: [
       { Name: 'email',          Value: body.email },
       { Name: 'email_verified', Value: 'true' },
-      { Name: 'custom:role',    Value: role },
     ],
     DesiredDeliveryMediums: ['EMAIL'],
   }));
 
-  return created({ email: body.email, role });
-}
-
-export async function updateUserRole(
-  event: APIGatewayProxyEventV2WithJWTAuthorizer,
-  username: string,
-): Promise<APIGatewayProxyResultV2> {
-  const caller = getCaller(event);
-  if (!requireAdmin(caller)) return forbidden();
-
-  let body: { role?: string };
-  try { body = JSON.parse(event.body ?? '{}'); } catch { return badRequest('Invalid JSON'); }
-  if (!body.role) return badRequest('role is required');
-
-  await cognitoClient.send(new AdminUpdateUserAttributesCommand({
+  await cognitoClient.send(new AdminAddUserToGroupCommand({
     UserPoolId: USER_POOL_ID,
-    Username:   username,
-    UserAttributes: [{ Name: 'custom:role', Value: body.role }],
+    Username:   body.email,
+    GroupName:  role,
   }));
 
-  return ok({ username, role: body.role });
+  return created({ email: body.email, role });
 }
 
 export async function deactivateUser(

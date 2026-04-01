@@ -10,11 +10,14 @@ export interface CallerInfo {
 
 export function getCaller(event: APIGatewayProxyEventV2WithJWTAuthorizer): CallerInfo {
   const claims = event.requestContext.authorizer.jwt.claims;
-  const role = (claims['custom:role'] as string | undefined) ?? 'viewer';
+  // Groups are serialized by API GW v2 as "[group1 group2]" — strip brackets, split on space
+  const groupsRaw = (claims['cognito:groups'] as string | undefined) ?? '';
+  const groups = groupsRaw.replace(/^\[|\]$/g, '').split(' ').filter(Boolean);
+  const role = (groups[0] as Role | undefined) ?? 'viewer';
   return {
     sub:   claims['sub'] as string,
     email: (claims['email'] as string | undefined) ?? claims['sub'] as string,
-    role:  role as Role,
+    role,
   };
 }
 

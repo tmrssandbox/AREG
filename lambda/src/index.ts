@@ -6,7 +6,7 @@ import { updateApp }     from './handlers/updateApp';
 import { deleteApp, restoreApp } from './handlers/deleteApp';
 import { getAudit }      from './handlers/getAudit';
 import { importApps }    from './handlers/importApps';
-import { listUsers, inviteUser, updateUserRole, deactivateUser, enableUser, recordSignIn } from './handlers/users';
+import { listUsers, inviteUser, deactivateUser, enableUser, recordSignIn } from './handlers/users';
 import { getSettings, putSettings } from './handlers/adminSettings';
 import { preSignUp } from './handlers/preSignUp';
 
@@ -115,7 +115,6 @@ export async function handler(event: LambdaEvent): Promise<APIGatewayProxyResult
   // /users/{username}
   const userMatch = path.match(/^\/users\/([^/]+)$/);
   if (userMatch) {
-    if (method === 'PUT')    return updateUserRole(event, decodeURIComponent(userMatch[1]));
     if (method === 'DELETE') return deactivateUser(event, decodeURIComponent(userMatch[1]));
   }
 

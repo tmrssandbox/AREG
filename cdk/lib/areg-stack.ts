@@ -210,12 +210,16 @@ export class AregStack extends cdk.Stack {
       actions: [
         'cognito-idp:ListUsers',
         'cognito-idp:AdminCreateUser',
-        'cognito-idp:AdminUpdateUserAttributes',
+        'cognito-idp:AdminAddUserToGroup',
+        'cognito-idp:AdminListGroupsForUser',
         'cognito-idp:AdminDisableUser',
         'cognito-idp:AdminEnableUser',
       ],
       resources: [userPoolArn],
     }));
+
+    // Role groups (admin, editor, viewer) exist in AREG Cognito pool — created once via CLI,
+    // not managed by CDK to avoid re-creation conflicts on existing pools.
 
     // AREG-29: pre-signup Lambda reads allowedDomains from ADMIN app registry
     apiLambda.addToRolePolicy(new iam.PolicyStatement({
