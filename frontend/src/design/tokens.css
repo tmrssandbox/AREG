@@ -72,6 +72,9 @@
   --radius-lg:   12px;
   --radius-full: 9999px;
 
+  /* Layout */
+  --nav-height: 64px;
+
   /* Transitions */
   --transition: 150ms ease;
 }

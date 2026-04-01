@@ -129,7 +129,7 @@
 /* Buttons */
 .modal-btn {
   flex: 1;
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-5);
   border-radius: var(--radius-md);
   font-family: var(--font-body);
   font-size: var(--text-sm);
