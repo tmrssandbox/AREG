@@ -31,7 +31,8 @@ export async function updateApp(
   const existing = result.Item as Record<string, unknown>;
   const caller   = getCaller(event);
 
-  // Editors may only update records they own (itContact or businessOwner)
+  // Viewers cannot write; editors may only update records they own
+  if (caller.role === 'viewer') return forbidden('Viewers cannot update records');
   if (caller.role === 'editor') {
     const isOwner = existing['itContact'] === caller.email ||
                     existing['businessOwner'] === caller.email;

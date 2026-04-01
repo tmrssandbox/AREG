@@ -1,11 +1,12 @@
 import { test, expect, Browser, Page } from '@playwright/test';
 import * as path from 'path';
 
-const BASE      = process.env.AREG_API_URL ?? 'https://aw3itbmhii.execute-api.us-east-2.amazonaws.com';
-const EMAIL     = process.env.AREG_TEST_EMAIL    ?? 'test-admin@areg.local';
-const PASSWORD  = process.env.AREG_TEST_PASSWORD ?? '';
-const APP_NAME  = 'AREG_TEST_APP';
-const IMPORT_NAME = 'AREG_TEST_IMPORT';
+const BASE         = process.env.AREG_API_URL ?? 'https://aw3itbmhii.execute-api.us-east-2.amazonaws.com';
+const EMAIL        = process.env.AREG_TEST_EMAIL        ?? 'test-admin@areg.local';
+const PASSWORD     = process.env.AREG_TEST_PASSWORD     ?? '';
+const VIEWER_EMAIL = process.env.AREG_VIEWER_EMAIL      ?? 'test-viewer@areg.local';
+const APP_NAME     = 'AREG_TEST_APP';
+const IMPORT_NAME  = 'AREG_TEST_IMPORT';
 
 // All tests run serially in a single browser page to preserve login state
 test.describe.configure({ mode: 'serial' });
@@ -14,28 +15,30 @@ let browser: Browser;
 let page: Page;
 let apiToken = '';
 
+const poolId   = process.env.AREG_USER_POOL_ID ?? 'us-east-2_Ts0PtOaEc';
+const clientId = process.env.AREG_CLIENT_ID   ?? '117u215jcpi0n2nsd4ud5fdn5j';
+
+async function cognitoAuth(username: string, password: string): Promise<string> {
+  const res = await fetch('https://cognito-idp.us-east-2.amazonaws.com/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-amz-json-1.1',
+      'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth',
+    },
+    body: JSON.stringify({
+      AuthFlow: 'USER_PASSWORD_AUTH',
+      ClientId: clientId,
+      AuthParameters: { USERNAME: username, PASSWORD: password },
+    }),
+  });
+  const data = await res.json() as { AuthenticationResult?: { IdToken?: string } };
+  return data.AuthenticationResult?.IdToken ?? '';
+}
+
 /** Obtain a JWT token via Cognito (used for pre/post test cleanup) */
 async function getToken(): Promise<string> {
   if (apiToken) return apiToken;
-  const poolId = process.env.AREG_USER_POOL_ID ?? 'us-east-2_Ts0PtOaEc';
-  const clientId = process.env.AREG_CLIENT_ID  ?? '117u215jcpi0n2nsd4ud5fdn5j';
-  const res = await fetch(
-    `https://cognito-idp.us-east-2.amazonaws.com/`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-amz-json-1.1',
-        'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth',
-      },
-      body: JSON.stringify({
-        AuthFlow: 'USER_PASSWORD_AUTH',
-        ClientId: clientId,
-        AuthParameters: { USERNAME: EMAIL, PASSWORD },
-      }),
-    },
-  );
-  const data = await res.json() as { AuthenticationResult?: { IdToken?: string } };
-  apiToken = data.AuthenticationResult?.IdToken ?? '';
+  apiToken = await cognitoAuth(EMAIL, PASSWORD);
   return apiToken;
 }
 
@@ -324,4 +327,51 @@ test('verify email page loads and shows code form', async () => {
   await expect(page.locator('h1')).toContainText('Verify your email');
   await expect(page.locator('input[placeholder="123456"]')).toBeVisible();
   await expect(page.locator('a[href="/login"]')).toBeVisible();
+});
+
+// ── Viewer role — API enforcement ─────────────────────────────────────────────
+
+test('viewer cannot create a record via API', async () => {
+  const token = await cognitoAuth(VIEWER_EMAIL, PASSWORD);
+  const res = await fetch(`${BASE}/apps`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: 'VIEWER_BLOCKED', description: 'should fail', vendor: 'v',
+      itContact: 'a@b.com', businessOwner: 'a@b.com', hoursOfOperation: '9-5',
+    }),
+  });
+  expect(res.status).toBe(403);
+});
+
+test('viewer cannot update a record via API', async () => {
+  // Use admin token to create a throwaway record, then attempt viewer update
+  const adminToken = await getToken();
+  const createRes = await fetch(`${BASE}/apps`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: 'VIEWER_UPDATE_TEST', description: 'temp', vendor: 'v',
+      itContact: 'a@b.com', businessOwner: 'a@b.com', hoursOfOperation: '9-5',
+    }),
+  });
+  const created = await createRes.json() as { appId?: string };
+  const appId = created.appId ?? '';
+
+  const viewerToken = await cognitoAuth(VIEWER_EMAIL, PASSWORD);
+  const updateRes = await fetch(`${BASE}/apps/${appId}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${viewerToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ notes: 'viewer attempted update' }),
+  });
+  expect(updateRes.status).toBe(403);
+
+  // Cleanup
+  await fetch(`${BASE}/apps/${appId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${adminToken}` } });
+});
+
+test('viewer can read the catalog via API', async () => {
+  const token = await cognitoAuth(VIEWER_EMAIL, PASSWORD);
+  const res = await fetch(`${BASE}/apps`, { headers: { Authorization: `Bearer ${token}` } });
+  expect(res.status).toBe(200);
 });

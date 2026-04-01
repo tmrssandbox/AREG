@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 import { ddb, TABLE_APPS } from '../lib/dynamo';
 import { writeAudit } from '../lib/auditLog';
 import { getCaller } from '../lib/auth';
-import { created, badRequest } from '../lib/response';
+import { created, badRequest, forbidden } from '../lib/response';
 
 const REQUIRED = ['name', 'description', 'vendor', 'itContact', 'businessOwner', 'hoursOfOperation'] as const;
 
@@ -24,6 +24,7 @@ export async function createApp(
   }
 
   const caller  = getCaller(event);
+  if (caller.role === 'viewer') return forbidden('Viewers cannot create records');
   const appId   = randomUUID();
   const now     = new Date().toISOString();
 

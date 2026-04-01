@@ -32,10 +32,10 @@ export default function AppDetailModal({ app, onClose, onChanged }: Props) {
   const canEdit = isAdmin || (isEditor && (app.itContact === email || app.businessOwner === email));
 
   useEffect(() => {
-    if (tab === 'audit' && !auditLoaded && isAdmin) {
+    if (tab === 'audit' && !auditLoaded) {
       api.getAudit(app.appId).then(r => { setAudit(r.entries); setAuditLoaded(true); });
     }
-  }, [tab, auditLoaded, isAdmin, app.appId]);
+  }, [tab, auditLoaded, app.appId]);
 
   async function handleDelete() {
     setBusy(true);
@@ -60,7 +60,7 @@ export default function AppDetailModal({ app, onClose, onChanged }: Props) {
         </div>
 
         <div className="modal-tabs">
-          {(['detail', ...(isAdmin ? ['audit'] : [])] as const).map(t => (
+          {(['detail', 'audit'] as const).map(t => (
             <button key={t} onClick={() => setTab(t as 'detail' | 'audit')}
               className={`modal-tab${tab === t ? ' active' : ''}`}>
               {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -87,7 +87,7 @@ export default function AppDetailModal({ app, onClose, onChanged }: Props) {
             </div>
           )}
 
-          {tab === 'audit' && isAdmin && (
+          {tab === 'audit' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               {audit.length === 0 && <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>No audit entries.</p>}
               {audit.map((e, i) => (
