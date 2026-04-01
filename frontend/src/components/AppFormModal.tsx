@@ -1,5 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { api, App } from '../lib/api';
+import './Modal.css';
 
 const REQUIRED = ['name', 'description', 'vendor', 'itContact', 'businessOwner', 'hoursOfOperation'] as const;
 const OPTIONAL  = ['department', 'renewalDate', 'notes'] as const;
@@ -35,22 +36,19 @@ export default function AppFormModal({ app, onClose, onSaved }: Props) {
 
   function field(key: string, type = 'text') {
     const isTextarea = key === 'notes' || key === 'description';
-    const cls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400';
     return (
-      <div key={key}>
-        <label className="block text-xs font-medium text-gray-600 mb-1">{LABELS[key]}</label>
+      <div key={key} className="modal-field">
+        <label>{LABELS[key]}</label>
         {isTextarea
           ? <textarea
               value={form[key]}
               onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
               rows={3}
-              className={cls}
             />
           : <input
               type={type}
               value={form[key]}
               onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-              className={cls}
             />
         }
       </div>
@@ -78,20 +76,20 @@ export default function AppFormModal({ app, onClose, onSaved }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
-        <h2 className="text-lg font-bold mb-4">{isEdit ? 'Edit Application' : 'Add Application'}</h2>
-        <form onSubmit={handleSubmit} className="space-y-3">
-          {REQUIRED.map(k => field(k, 'text'))}
-          {OPTIONAL.map(k  => field(k, k === 'renewalDate' ? 'date' : 'text'))}
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose}
-              className="flex-1 border border-gray-300 rounded-lg py-2 text-sm hover:bg-gray-50">
-              Cancel
-            </button>
-            <button type="submit" disabled={busy}
-              className="flex-1 bg-indigo-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50">
+    <div className="modal-overlay">
+      <div className="modal modal--sm">
+        <div className="modal-header">
+          <h2>{isEdit ? 'Edit Application' : 'Add Application'}</h2>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body modal-form">
+            {REQUIRED.map(k => field(k, 'text'))}
+            {OPTIONAL.map(k  => field(k, k === 'renewalDate' ? 'date' : 'text'))}
+            {error && <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-error)', margin: 0 }}>{error}</p>}
+          </div>
+          <div className="modal-footer">
+            <button type="button" onClick={onClose} className="modal-btn modal-btn--cancel">Cancel</button>
+            <button type="submit" disabled={busy} className="modal-btn modal-btn--primary">
               {busy ? 'Saving…' : 'Save'}
             </button>
           </div>

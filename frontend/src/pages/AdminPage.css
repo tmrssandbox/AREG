@@ -33,7 +33,7 @@
 
 /* ── Settings tab ── */
 .settings-section-card {
-  background: var(--color-surface);
+  background: var(--color-surface-raised);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: var(--space-6);
@@ -110,7 +110,7 @@
   font-family: var(--font-body);
   font-size: var(--text-sm);
   color: var(--color-text);
-  background: var(--color-surface-raised);
+  background: var(--color-surface);
   max-width: 280px;
 }
 .settings-text-input:focus { outline: none; border-color: var(--color-primary); }
