@@ -1,24 +1,26 @@
 import { GetCommand } from '@aws-sdk/lib-dynamodb';
-import { ddb, TABLE_APPS } from '../lib/dynamo';
+import { ddb } from '../lib/dynamo';
 import { CognitoTriggerEvent } from '../index';
+
+const ADMIN_APPS_TABLE = process.env.ADMIN_APPS_TABLE ?? 'tmrs-admin-ddb-apps';
 
 export async function preSignUp(event: CognitoTriggerEvent): Promise<CognitoTriggerEvent> {
   const email  = (event.request.userAttributes['email'] ?? '').toLowerCase();
   const domain = email.split('@')[1] ?? '';
 
-  // Read allowed_domains setting from DynamoDB
+  // Read allowedDomains from ADMIN app registry (tmrs-admin-ddb-apps, appId=areg)
   const result = await ddb.send(new GetCommand({
-    TableName: TABLE_APPS,
-    Key: { PK: 'SETTING#allowed_domains', SK: 'CONFIG' },
+    TableName: ADMIN_APPS_TABLE,
+    Key: { appId: 'areg' },
   }));
 
-  const raw = result.Item?.value as string | undefined;
+  const allowed: string[] = result.Item?.allowedDomains ?? [];
 
-  // If no domains configured, allow everyone
-  if (!raw || !raw.trim()) return event;
-
-  const allowed = raw.split(',').map(d => d.trim().toLowerCase()).filter(Boolean);
-  if (allowed.length === 0) return event;
+  // If no domains configured, fail closed — block all self-registration
+  if (allowed.length === 0) {
+    console.warn('AREG preSignUp: no allowedDomains in ADMIN registry — blocking sign-up');
+    throw new Error('Self-registration is not currently enabled.');
+  }
 
   if (!allowed.includes(domain)) {
     throw new Error(`Sign-up is restricted to: ${allowed.join(', ')}`);

@@ -172,10 +172,11 @@ export class AregStack extends cdk.Stack {
       handler:      'index.handler',
       code:         lambda.Code.fromAsset(path.join(__dirname, '../../lambda/dist')),
       environment: {
-        TABLE_APPS:   'areg-ddb-apps',
-        TABLE_AUDIT:  'areg-ddb-audit',
-        REGION:       this.region,
-        USER_POOL_ID: 'us-east-2_Ts0PtOaEc',  // stable — retained pool, see /areg/cognito-user-pool-id
+        TABLE_APPS:        'areg-ddb-apps',
+        TABLE_AUDIT:       'areg-ddb-audit',
+        ADMIN_APPS_TABLE:  'tmrs-admin-ddb-apps',
+        REGION:            this.region,
+        USER_POOL_ID:      'us-east-2_Ts0PtOaEc',  // stable — retained pool, see /areg/cognito-user-pool-id
       },
       timeout: cdk.Duration.seconds(29),
     });
@@ -212,6 +213,12 @@ export class AregStack extends cdk.Stack {
         'cognito-idp:AdminEnableUser',
       ],
       resources: [userPoolArn],
+    }));
+
+    // AREG-29: pre-signup Lambda reads allowedDomains from ADMIN app registry
+    apiLambda.addToRolePolicy(new iam.PolicyStatement({
+      actions:   ['dynamodb:GetItem'],
+      resources: [`arn:aws:dynamodb:us-east-2:979952482911:table/tmrs-admin-ddb-apps`],
     }));
 
     const httpApi = new apigwv2.HttpApi(this, 'AregApigwApi', {
