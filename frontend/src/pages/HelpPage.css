@@ -33,7 +33,7 @@
 
 .help-notice {
   border-color: var(--color-warning, #f59e0b);
-  background: var(--color-warning-bg, #fffbeb);
+  background: var(--color-warning-light);
 }
 
 .help-notice p {
