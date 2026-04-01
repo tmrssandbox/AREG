@@ -26,16 +26,16 @@ export default function HelpPage() {
       <div className="help-section">
         <h2>About Application Registry</h2>
         <p>
-          Application Registry is a centralized catalog for tracking TMRS Studios software
-          applications. It allows administrators to record and manage key details for each
-          application including vendor information, IT contacts, business owners, renewal
-          dates, and hours of operation.
+          Application Registry is a tool for capturing and managing a basic inventory of products
+          in use, including internal business owner and technical contacts, service hours and
+          expected availability during those hours, vendor and contract renewal information, rough
+          estimates on feature utilization, and criticality to business. This tool provides an easy
+          way to filter on and update these details.
         </p>
         <p>
-          The registry provides a searchable catalog of active applications, an archive for
-          retired applications, bulk import capabilities, and a full change history for
-          audit purposes. Access is role-based: standard users can view the catalog, while
-          administrators can create, edit, and manage applications and users.
+          As of Version 0.4 administrative features related to domains, user, and database
+          management have been removed from this application. These features are now provided
+          in a centralized management tool instead at <a href="https://admin.tmrs.studio" target="_blank" rel="noreferrer">admin.tmrs.studio</a>.
         </p>
       </div>
 
