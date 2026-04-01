@@ -54,7 +54,7 @@ export default function LoginPage() {
           <div className="auth-hero">
             <p className="auth-hero__presents">TMRS Studios presents:</p>
             <img
-              src="/LogoApplicationRegistryWhiteBackground.png.png"
+              src="/LogoApplicationRegistryWhiteBackground.png"
               alt="Application Registry"
               className="auth-hero__logo"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}

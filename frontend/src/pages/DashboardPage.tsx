@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, App } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 
 function daysUntil(dateStr?: string): number | null {
   if (!dateStr) return null;
@@ -24,6 +25,7 @@ function StatCard({ label, value, sub }: { label: string; value: number; sub?: s
 }
 
 export default function DashboardPage() {
+  const { name, email } = useAuth();
   const [apps,    setApps]    = useState<App[]>([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState('');
@@ -51,7 +53,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      <h1 className="text-2xl font-bold text-gray-800">Home</h1>
+      <h1 className="text-2xl font-bold text-gray-800">Welcome, {name || email}</h1>
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

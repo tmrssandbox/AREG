@@ -33,7 +33,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="topnav-left">
             <Link to="/" className="topnav-brand">
               <img
-                src="/LogoApplicationRegistryWhiteBackground.png.png"
+                src="/LogoApplicationRegistryWhiteBackground.png"
                 alt="Application Registry"
                 className="topnav-brand-logo"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}

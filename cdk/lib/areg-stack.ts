@@ -178,7 +178,7 @@ export class AregStack extends cdk.Stack {
         ADMIN_APPS_TABLE:  'tmrs-admin-ddb-apps',
         REGION:            this.region,
         USER_POOL_ID:      'us-east-2_Ts0PtOaEc',  // stable — retained pool, see /areg/cognito-user-pool-id
-        DEPLOY_VERSION:    execSync('git rev-parse --short HEAD').toString().trim(),
+        DEPLOY_VERSION:    execSync('git describe --tags --abbrev=0').toString().trim().replace(/^v/, ''),
       },
       timeout: cdk.Duration.seconds(29),
     });

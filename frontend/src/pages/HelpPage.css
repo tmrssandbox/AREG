@@ -44,5 +44,5 @@
 .help-version {
   font-size: var(--text-sm);
   color: var(--color-text-muted);
-  margin-top: var(--space-4);
+  margin-top: var(--space-2);
 }

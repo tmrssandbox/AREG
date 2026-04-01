@@ -40,9 +40,7 @@ export default function HelpPage() {
       </div>
 
       {version && (
-        <div className="help-version">
-          Version: {version}
-        </div>
+        <div className="help-version">Version: {version}</div>
       )}
     </div>
   );
