@@ -6,7 +6,7 @@ import { updateApp }     from './handlers/updateApp';
 import { deleteApp, restoreApp } from './handlers/deleteApp';
 import { getAudit }      from './handlers/getAudit';
 import { importApps }    from './handlers/importApps';
-import { recordSignIn } from './handlers/users';
+import { recordSignIn, deleteMe } from './handlers/users';
 import { preSignUp } from './handlers/preSignUp';
 
 // Cognito trigger event shape (pre-signup and post-authentication)
@@ -75,6 +75,9 @@ export async function handler(event: LambdaEvent): Promise<APIGatewayProxyResult
   if (method === 'GET' && path === '/version') {
     return resp(200, { version: process.env.DEPLOY_VERSION ?? 'unknown' });
   }
+
+  // Users routes
+  if (method === 'DELETE' && path === '/users/me') return deleteMe(event);
 
   // Apps routes
   if (method === 'GET'  && path === '/apps')           return listApps(event);

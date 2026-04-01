@@ -329,6 +329,30 @@ test('verify email page loads and shows code form', async () => {
   await expect(page.locator('a[href="/login"]')).toBeVisible();
 });
 
+// ── Profile — MFA UI structure ────────────────────────────────────────────────
+
+test('profile page shows mfa-option card with label', async () => {
+  await page.goto('/login');
+  await page.fill('input[type="email"]', EMAIL);
+  await page.fill('input[type="password"]', PASSWORD);
+  await page.click('button[type="submit"]');
+  await page.waitForURL('/', { timeout: 15_000 });
+  await page.goto('/profile');
+  await expect(page.locator('.mfa-option')).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator('.mfa-option-label')).toContainText('Authenticator app');
+});
+
+// ── DELETE /users/me — backend data cleanup ───────────────────────────────────
+
+test('DELETE /users/me returns 204 for authenticated user', async () => {
+  const token = await getToken();
+  const res = await fetch(`${BASE}/users/me`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(res.status).toBe(204);
+});
+
 // ── Viewer role — API enforcement ─────────────────────────────────────────────
 
 test('viewer cannot create a record via API', async () => {

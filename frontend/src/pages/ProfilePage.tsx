@@ -3,6 +3,7 @@ import { updatePassword, updateUserAttributes, setUpTOTP, verifyTOTPSetup, updat
 import { QRCodeSVG } from 'qrcode.react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../lib/api';
 import './ProfilePage.css';
 
 type TotpStep = 'idle' | 'scan' | 'verify';
@@ -141,6 +142,7 @@ export default function ProfilePage() {
     setDeleteErr('');
     setDeleteBusy(true);
     try {
+      await api.deleteMe();
       await deleteUser();
       await logout();
       navigate('/login');
@@ -208,51 +210,56 @@ export default function ProfilePage() {
         {mfaErr && <div className="error-msg">{mfaErr}</div>}
         {mfaMsg && <div className="success-msg">{mfaMsg}</div>}
 
-        {mfaEnabled ? (
-          <>
-            <p className="settings-desc">
-              Two-factor authentication is <strong>enabled</strong>. You will be asked for a code
-              from your authenticator app on every sign in.
-            </p>
-            <button className="btn-danger" onClick={handleDisableMfa} disabled={mfaBusy}>
-              {mfaBusy ? 'Disabling…' : 'Disable 2FA'}
-            </button>
-          </>
-        ) : (
-          <>
-            <p className="settings-desc">Add an extra layer of security using an authenticator app.</p>
-
-            {totpStep === 'idle' && (
-              <button className="btn-save" onClick={handleSetupTotp} disabled={mfaBusy}>
-                {mfaBusy ? 'Setting up…' : 'Set up authenticator'}
-              </button>
-            )}
-
-            {totpStep === 'scan' && (
-              <div className="mfa-setup">
+        <div className="mfa-options">
+          <div className="mfa-option">
+            <div className="mfa-option-label">Authenticator app <span className="mfa-recommended">(recommended)</span></div>
+            {mfaEnabled ? (
+              <>
                 <p className="settings-desc">
-                  Scan the QR code with Google Authenticator, Authy, or any TOTP app. Or enter
-                  the secret key manually.
+                  Two-factor authentication is <strong>enabled</strong>. You will be asked for a
+                  code from your authenticator app on every sign in.
                 </p>
-                <div className="mfa-qr">
-                  <QRCodeSVG value={totpUri} size={180} />
-                </div>
-                <code className="totp-secret">{totpSecret}</code>
-                <form onSubmit={handleVerifyTotp} className="mfa-verify-form">
-                  <div className="settings-field">
-                    <label htmlFor="totp-code">Enter the 6-digit code from your app to confirm</label>
-                    <input id="totp-code" type="text" value={totpCode}
-                      onChange={e => setTotpCode(e.target.value)}
-                      required maxLength={6} autoFocus inputMode="numeric" />
-                  </div>
-                  <button type="submit" className="btn-save" disabled={mfaBusy}>
-                    {mfaBusy ? 'Verifying…' : 'Verify and enable'}
+                <button className="btn-danger" onClick={handleDisableMfa} disabled={mfaBusy}>
+                  {mfaBusy ? 'Disabling…' : 'Disable 2FA'}
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="settings-desc">Add an extra layer of security using an authenticator app.</p>
+
+                {totpStep === 'idle' && (
+                  <button className="btn-save" onClick={handleSetupTotp} disabled={mfaBusy}>
+                    {mfaBusy ? 'Setting up…' : 'Set up authenticator'}
                   </button>
-                </form>
-              </div>
+                )}
+
+                {totpStep === 'scan' && (
+                  <div className="mfa-setup">
+                    <p className="settings-desc">
+                      Scan the QR code with Google Authenticator, Authy, or any TOTP app. Or enter
+                      the secret key manually.
+                    </p>
+                    <div className="mfa-qr">
+                      <QRCodeSVG value={totpUri} size={180} />
+                    </div>
+                    <code className="totp-secret">{totpSecret}</code>
+                    <form onSubmit={handleVerifyTotp} className="mfa-verify-form">
+                      <div className="settings-field">
+                        <label htmlFor="totp-code">Enter the 6-digit code from your app to confirm</label>
+                        <input id="totp-code" type="text" value={totpCode}
+                          onChange={e => setTotpCode(e.target.value)}
+                          required maxLength={6} autoFocus inputMode="numeric" />
+                      </div>
+                      <button type="submit" className="btn-save" disabled={mfaBusy}>
+                        {mfaBusy ? 'Verifying…' : 'Verify and enable'}
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </>
             )}
-          </>
-        )}
+          </div>
+        </div>
       </section>
       {/* Delete account */}
       <section className="settings-section settings-danger">

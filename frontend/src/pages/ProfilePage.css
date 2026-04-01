@@ -101,6 +101,29 @@
 .btn-danger:hover:not(:disabled) { opacity: 0.85; }
 .btn-danger:disabled { opacity: 0.6; cursor: not-allowed; }
 
+.mfa-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.mfa-option {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.mfa-option-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  margin-bottom: var(--space-3);
+}
+
+.mfa-recommended {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
 .mfa-setup {
   display: flex;
   flex-direction: column;

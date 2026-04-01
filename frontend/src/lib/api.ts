@@ -61,4 +61,5 @@ export const api = {
   deleteApp:    (id: string) => request<void>('DELETE', `/apps/${id}`),
   restoreApp:   (id: string) => request<void>('POST', `/apps/${id}/restore`),
   getAudit:     (id: string) => request<{ entries: AuditEntry[] }>('GET', `/audit/${id}`),
+  deleteMe:     () => request<void>('DELETE', '/users/me'),
 };
