@@ -46,6 +46,14 @@
   display: block;
 }
 
+.topnav-brand-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  margin-left: var(--space-2);
+}
+
 .topnav-nav {
   display: flex;
   align-items: center;

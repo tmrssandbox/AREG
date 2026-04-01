@@ -3,7 +3,7 @@ import { fetchAuthSession } from 'aws-amplify/auth';
 import { api, App } from '../lib/api';
 import './AdminPage.css';
 
-type AdminTab = 'archive' | 'import' | 'users' | 'settings';
+type AdminTab = 'archive' | 'import' | 'users';
 
 const BASE = 'https://aw3itbmhii.execute-api.us-east-2.amazonaws.com';
 
@@ -31,7 +31,7 @@ export default function AdminPage() {
       <h1>Admin</h1>
 
       <div className="admin-tabs">
-        {(['archive', 'import', 'users', 'settings'] as AdminTab[]).map(t => (
+        {(['archive', 'import', 'users'] as AdminTab[]).map(t => (
           <button
             key={t}
             className={`admin-tab${tab === t ? ' active' : ''}`}
@@ -45,7 +45,6 @@ export default function AdminPage() {
       {tab === 'archive'  && <ArchiveSection />}
       {tab === 'import'   && <ImportSection />}
       {tab === 'users'    && <UsersSection />}
-      {tab === 'settings' && <SettingsSection />}
     </div>
   );
 }
@@ -468,112 +467,3 @@ function UsersSection() {
   );
 }
 
-// ─── Settings ─────────────────────────────────────────────────────────────────
-
-function SettingsSection() {
-  const [loading,     setLoading]     = useState(true);
-  const [saveLoading, setSaveLoading] = useState(false);
-  const [msg,         setMsg]         = useState('');
-  const [err,         setErr]         = useState('');
-
-  const [domains,      setDomains]      = useState<string[]>([]);
-  const [newDomain,    setNewDomain]    = useState('');
-  const [phoneEnabled, setPhoneEnabled] = useState(false);
-
-  useEffect(() => {
-    apiFetch('/admin/settings')
-      .then((data: Record<string, string>) => {
-        const dom   = data['allowed_domains'];
-        const phone = data['phone_enabled'];
-        if (dom)   setDomains(dom.split(',').map((d: string) => d.trim()).filter(Boolean));
-        if (phone) setPhoneEnabled(phone === 'true');
-      })
-      .catch(e => setErr(e instanceof Error ? e.message : 'Failed to load settings'))
-      .finally(() => setLoading(false));
-  }, []);
-
-  function addDomain() {
-    const d = newDomain.trim().toLowerCase();
-    if (d && !domains.includes(d)) setDomains(prev => [...prev, d]);
-    setNewDomain('');
-  }
-
-  function removeDomain(d: string) {
-    setDomains(prev => prev.filter(x => x !== d));
-  }
-
-  async function handleSave() {
-    setErr(''); setMsg('');
-    setSaveLoading(true);
-    try {
-      await apiFetch('/admin/settings', {
-        method: 'PUT',
-        body: JSON.stringify({
-          allowed_domains: domains.join(','),
-          phone_enabled: String(phoneEnabled),
-        }),
-      });
-      setMsg('Settings saved.');
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Save failed');
-    } finally {
-      setSaveLoading(false);
-    }
-  }
-
-  if (loading) return <div className="text-gray-500">Loading…</div>;
-
-  return (
-    <div>
-      {err && <div className="settings-msg error">{err}</div>}
-      {msg && <div className="settings-msg success">{msg}</div>}
-
-      <div className="settings-section-card">
-        <h2>Allowed Sign-up Domains</h2>
-        <div className="settings-row">
-          <label>
-            Allowed sign-up domains
-            <span className="info-icon" data-tooltip="Only users with these email domains can register. Leave empty to allow all domains.">ℹ</span>
-          </label>
-          <div className="domain-tags">
-            {domains.map(d => (
-              <span key={d} className="domain-tag">
-                {d}
-                <button className="domain-tag-remove" onClick={() => removeDomain(d)} title="Remove domain">🗑</button>
-              </span>
-            ))}
-          </div>
-          <div className="domain-add-row">
-            <input
-              type="text"
-              value={newDomain}
-              onChange={e => setNewDomain(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addDomain(); } }}
-              placeholder="example.com"
-              className="settings-text-input"
-            />
-            <button className="btn-add-domain" onClick={addDomain}>Add</button>
-          </div>
-        </div>
-      </div>
-
-      <div className="settings-section-card">
-        <h2>Phone / SMS Support</h2>
-        <div className="settings-row">
-          <label className="toggle-label">
-            <input
-              type="checkbox"
-              checked={phoneEnabled}
-              onChange={e => setPhoneEnabled(e.target.checked)}
-            />
-            <span>{phoneEnabled ? 'Enabled' : 'Disabled'} — phone number fields and SMS 2FA</span>
-          </label>
-        </div>
-      </div>
-
-      <button className="btn-save-settings" onClick={handleSave} disabled={saveLoading}>
-        {saveLoading ? 'Saving…' : 'Save settings'}
-      </button>
-    </div>
-  );
-}

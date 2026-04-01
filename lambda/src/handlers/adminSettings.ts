@@ -4,7 +4,7 @@ import { ddb, TABLE_APPS } from '../lib/dynamo';
 import { getCaller, requireAdmin } from '../lib/auth';
 import { ok, badRequest, forbidden } from '../lib/response';
 
-const SETTING_KEYS = ['allowed_domains', 'phone_enabled'] as const;
+const SETTING_KEYS = ['allowed_domains'] as const;
 
 export async function getSettings(
   event: APIGatewayProxyEventV2WithJWTAuthorizer,

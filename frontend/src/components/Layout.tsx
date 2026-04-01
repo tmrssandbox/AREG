@@ -4,7 +4,7 @@ import AppFooter from './AppFooter';
 import './Layout.css';
 
 const NAV_LEFT = [
-  { path: '/',        label: 'Dashboard', adminOnly: false, end: true },
+  { path: '/',        label: 'Home',      adminOnly: false, end: true },
   { path: '/catalog', label: 'Catalog',   adminOnly: false, end: false },
   { path: '/admin',   label: 'Admin',     adminOnly: true,  end: false },
 ];
@@ -38,6 +38,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 className="topnav-brand-logo"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
+              <span className="topnav-brand-name">Application Registry</span>
             </Link>
 
             <nav className="topnav-nav">
