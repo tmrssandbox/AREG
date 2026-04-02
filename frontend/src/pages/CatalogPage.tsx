@@ -91,7 +91,7 @@ export default function CatalogPage() {
     let result = apps;
     if (search) {
       const q = search.toLowerCase();
-      result = result.filter(a => a.name.toLowerCase().includes(q) || a.description.toLowerCase().includes(q));
+      result = result.filter(a => a.name.toLowerCase().includes(q) || (a.description ?? '').toLowerCase().includes(q));
     }
     for (const [k, v] of Object.entries(filters)) {
       if (v) result = result.filter(a => (a[k as TextFilterField] ?? '') === v);
@@ -205,7 +205,7 @@ export default function CatalogPage() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
-              {['Application', 'Vendor', 'Business Owner', 'Technical Contact', 'Dept', 'Service Hours', 'Criticality', 'Renewal Date', 'Status'].map(h => (
+              {['Application', 'Department', 'Business Owner', 'Technical Contact', 'Service Hours', 'Service Level', 'Criticality', 'Status', 'Renewal Date'].map(h => (
                 <th key={h} className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -218,18 +218,18 @@ export default function CatalogPage() {
               <tr key={app.appId} onClick={() => setSelected(app)}
                 className="border-b border-gray-50 hover:bg-indigo-50 cursor-pointer transition-colors">
                 <td className="px-4 py-3 font-medium text-indigo-700">{app.name}</td>
-                <td className="px-4 py-3 text-gray-700">{app.vendorName}</td>
+                <td className="px-4 py-3 text-gray-500">{resolve(configMaps.department, app.department)}</td>
                 <td className="px-4 py-3 text-gray-700">{app.tmrsBusinessOwner}</td>
                 <td className="px-4 py-3 text-gray-700">{app.tmrsTechnicalContact}</td>
-                <td className="px-4 py-3 text-gray-500">{resolve(configMaps.department, app.department)}</td>
                 <td className="px-4 py-3 text-gray-500">{resolve(configMaps.serviceHours, app.serviceHours)}</td>
+                <td className="px-4 py-3 text-gray-500">{resolve(configMaps.serviceLevel, app.serviceLevel)}</td>
                 <td className="px-4 py-3 text-gray-500">{app.businessCriticality ?? '—'}</td>
-                <td className="px-4 py-3 text-gray-500">{app.renewalDate ?? '—'}</td>
                 <td className="px-4 py-3">
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${app.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
                     {app.status}
                   </span>
                 </td>
+                <td className="px-4 py-3 text-gray-500">{app.renewalDate ?? '—'}</td>
               </tr>
             ))}
           </tbody>
