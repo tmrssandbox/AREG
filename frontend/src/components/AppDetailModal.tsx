@@ -179,7 +179,6 @@ export default function AppDetailModal({ app, configMaps, onClose, onChanged, in
               <Row label="Department"                value={resolveLabel(configMaps.department, app.department)} />
               <Row label="Next Contract Renewal"     value={app.renewalDate} />
               <Row label="Notes"                     value={app.notes} />
-              <Row label="Status"                    value={app.status} />
               <Row label="Created By"                value={app.createdBy} />
               <Row label="Created At"                value={app.createdAt?.slice(0, 10)} />
               <Row label="Modified By"               value={app.modifiedBy} />
@@ -280,7 +279,10 @@ export default function AppDetailModal({ app, configMaps, onClose, onChanged, in
         </div>
 
         <div className="modal-footer">
-          {canEdit && (
+          {!confirmDel && (
+            <button onClick={onClose} className="modal-btn modal-btn--cancel">Done</button>
+          )}
+          {canEdit && !confirmDel && (
             <button onClick={() => setEditing(true)} className="modal-btn modal-btn--outline-primary">
               Edit
             </button>
