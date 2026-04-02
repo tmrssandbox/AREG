@@ -1,16 +1,28 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { api, App } from '../lib/api';
+import { api, App, ConfigValue, ServiceHoursValue, ServiceLevelValue } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import AppDetailModal from '../components/AppDetailModal';
 import AppFormModal   from '../components/AppFormModal';
 
-const FILTER_FIELDS = ['vendor', 'businessOwner', 'itContact', 'department', 'hoursOfOperation'] as const;
-type FilterField = typeof FILTER_FIELDS[number];
+// Config maps for resolving IDs to labels
+interface ConfigMaps {
+  serviceHours: Map<string, string>;
+  serviceLevel: Map<string, string>;
+  department:   Map<string, string>;
+}
 
-const COL_LABELS: Record<FilterField, string> = {
-  vendor: 'Vendor', businessOwner: 'Business Owner', itContact: 'IT Contact',
-  department: 'Department', hoursOfOperation: 'Hours',
+function buildMap(values: ConfigValue[]): Map<string, string> {
+  return new Map(values.map(v => [v.id, v.label]));
+}
+
+// Filterable free-text fields (derived from app data)
+const TEXT_FILTER_FIELDS = ['vendorName', 'tmrsBusinessOwner', 'tmrsTechnicalContact', 'businessCriticality'] as const;
+type TextFilterField = typeof TEXT_FILTER_FIELDS[number];
+
+const TEXT_LABELS: Record<TextFilterField, string> = {
+  vendorName: 'Vendor', tmrsBusinessOwner: 'Business Owner',
+  tmrsTechnicalContact: 'Technical Contact', businessCriticality: 'Criticality',
 };
 
 export default function CatalogPage() {
@@ -20,15 +32,38 @@ export default function CatalogPage() {
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState('');
   const [search,  setSearch]  = useState('');
-  const [filters, setFilters] = useState<Partial<Record<FilterField, string>>>({});
-  const [selected,setSelected]= useState<App | null>(null);
-  const [adding,  setAdding]  = useState(false);
+  const [filters, setFilters] = useState<Partial<Record<TextFilterField, string>>>({});
+  // Config-backed filters store config IDs
+  const [shFilter,   setShFilter]   = useState('');
+  const [slFilter,   setSlFilter]   = useState('');
+  const [deptFilter, setDeptFilter] = useState('');
+  const [selected,   setSelected]   = useState<App | null>(null);
+  const [adding,     setAdding]     = useState(false);
+  const [configMaps, setConfigMaps] = useState<ConfigMaps>({
+    serviceHours: new Map(), serviceLevel: new Map(), department: new Map(),
+  });
+  const [serviceHoursList, setServiceHoursList] = useState<ServiceHoursValue[]>([]);
+  const [serviceLevelList, setServiceLevelList] = useState<ServiceLevelValue[]>([]);
+  const [departmentList,   setDepartmentList]   = useState<ConfigValue[]>([]);
 
   function load() {
     setLoading(true);
-    api.listApps({ limit: '1000' })
-      .then(r => setApps(r.items))
-      .catch(e => setError(e.message))
+    Promise.all([
+      api.listApps({ limit: '1000' }),
+      api.getConfig('serviceHours'),
+      api.getConfig('serviceLevel'),
+      api.getConfig('department'),
+    ]).then(([appsRes, sh, sl, dept]) => {
+      setApps(appsRes.items);
+      setServiceHoursList(sh as ServiceHoursValue[]);
+      setServiceLevelList(sl as ServiceLevelValue[]);
+      setDepartmentList(dept);
+      setConfigMaps({
+        serviceHours: buildMap(sh),
+        serviceLevel: buildMap(sl),
+        department:   buildMap(dept),
+      });
+    }).catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }
 
@@ -43,10 +78,10 @@ export default function CatalogPage() {
     }
   }, [searchParams, apps]);
 
-  // Unique values for filter dropdowns
-  const options = useMemo(() => {
-    const out: Partial<Record<FilterField, string[]>> = {};
-    for (const f of FILTER_FIELDS) {
+  // Unique values for free-text filter dropdowns
+  const textOptions = useMemo(() => {
+    const out: Partial<Record<TextFilterField, string[]>> = {};
+    for (const f of TEXT_FILTER_FIELDS) {
       out[f] = [...new Set(apps.map(a => (a[f] as string | undefined) ?? '').filter(Boolean))].sort();
     }
     return out;
@@ -59,16 +94,25 @@ export default function CatalogPage() {
       result = result.filter(a => a.name.toLowerCase().includes(q) || a.description.toLowerCase().includes(q));
     }
     for (const [k, v] of Object.entries(filters)) {
-      if (v) result = result.filter(a => (a[k as FilterField] ?? '') === v);
+      if (v) result = result.filter(a => (a[k as TextFilterField] ?? '') === v);
     }
+    if (shFilter)   result = result.filter(a => a.serviceHours === shFilter);
+    if (slFilter)   result = result.filter(a => a.serviceLevel === slFilter);
+    if (deptFilter) result = result.filter(a => a.department   === deptFilter);
     return result;
-  }, [apps, search, filters]);
+  }, [apps, search, filters, shFilter, slFilter, deptFilter]);
 
-  function clearFilter(key: FilterField) {
+  function clearFilter(key: TextFilterField) {
     setFilters(f => { const next = { ...f }; delete next[key]; return next; });
   }
 
-  const activeFilters = (Object.entries(filters) as [FilterField, string][]).filter(([, v]) => v);
+  const activeFilters = (Object.entries(filters) as [TextFilterField, string][]).filter(([, v]) => v);
+  const hasConfigFilters = shFilter || slFilter || deptFilter;
+
+  function resolve(map: Map<string, string>, id?: string): string {
+    if (!id) return '—';
+    return map.get(id) ?? id;
+  }
 
   if (loading) return <div className="text-gray-500">Loading…</div>;
   if (error)   return <div className="text-red-600">{error}</div>;
@@ -95,53 +139,91 @@ export default function CatalogPage() {
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
         />
         <div className="flex flex-wrap gap-2">
-          {FILTER_FIELDS.map(f => (
+          {/* Free-text field filters */}
+          {TEXT_FILTER_FIELDS.map(f => (
             <select key={f} value={filters[f] ?? ''}
               onChange={e => setFilters(prev => ({ ...prev, [f]: e.target.value || undefined }))}
               className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
-              <option value="">All {COL_LABELS[f]}</option>
-              {(options[f] ?? []).map(v => <option key={v} value={v}>{v}</option>)}
+              <option value="">All {TEXT_LABELS[f]}</option>
+              {(textOptions[f] ?? []).map(v => <option key={v} value={v}>{v}</option>)}
             </select>
           ))}
+
+          {/* Config-backed filters */}
+          <select value={shFilter} onChange={e => setShFilter(e.target.value)}
+            className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <option value="">All Service Hours</option>
+            {serviceHoursList.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+          </select>
+
+          <select value={slFilter} onChange={e => setSlFilter(e.target.value)}
+            className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <option value="">All Service Levels</option>
+            {serviceLevelList.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+          </select>
+
+          <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)}
+            className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <option value="">All Departments</option>
+            {departmentList.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+          </select>
         </div>
-        {activeFilters.length > 0 && (
+
+        {(activeFilters.length > 0 || hasConfigFilters) && (
           <div className="flex flex-wrap gap-2">
             {activeFilters.map(([k, v]) => (
               <span key={k} className="inline-flex items-center bg-indigo-100 text-indigo-700 text-xs px-2 py-1 rounded-full">
-                {COL_LABELS[k]}: {v}
+                {TEXT_LABELS[k]}: {v}
                 <button onClick={() => clearFilter(k)} className="ml-1 font-bold hover:text-indigo-900">×</button>
               </span>
             ))}
+            {shFilter && (
+              <span className="inline-flex items-center bg-indigo-100 text-indigo-700 text-xs px-2 py-1 rounded-full">
+                Hours: {configMaps.serviceHours.get(shFilter)}
+                <button onClick={() => setShFilter('')} className="ml-1 font-bold hover:text-indigo-900">×</button>
+              </span>
+            )}
+            {slFilter && (
+              <span className="inline-flex items-center bg-indigo-100 text-indigo-700 text-xs px-2 py-1 rounded-full">
+                Level: {configMaps.serviceLevel.get(slFilter)}
+                <button onClick={() => setSlFilter('')} className="ml-1 font-bold hover:text-indigo-900">×</button>
+              </span>
+            )}
+            {deptFilter && (
+              <span className="inline-flex items-center bg-indigo-100 text-indigo-700 text-xs px-2 py-1 rounded-full">
+                Dept: {configMaps.department.get(deptFilter)}
+                <button onClick={() => setDeptFilter('')} className="ml-1 font-bold hover:text-indigo-900">×</button>
+              </span>
+            )}
           </div>
         )}
       </div>
 
-      {/* Record count */}
       <p className="text-sm text-gray-500">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</p>
 
-      {/* Table */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
-              {['Application', 'Vendor', 'Business Owner', 'IT Contact', 'Dept', 'Hours', 'Renewal Date', 'Status'].map(h => (
+              {['Application', 'Vendor', 'Business Owner', 'Technical Contact', 'Dept', 'Service Hours', 'Criticality', 'Renewal Date', 'Status'].map(h => (
                 <th key={h} className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
-              <tr><td colSpan={8} className="text-center py-8 text-gray-400">No records found</td></tr>
+              <tr><td colSpan={9} className="text-center py-8 text-gray-400">No records found</td></tr>
             )}
             {filtered.map(app => (
               <tr key={app.appId} onClick={() => setSelected(app)}
                 className="border-b border-gray-50 hover:bg-indigo-50 cursor-pointer transition-colors">
                 <td className="px-4 py-3 font-medium text-indigo-700">{app.name}</td>
-                <td className="px-4 py-3 text-gray-700">{app.vendor}</td>
-                <td className="px-4 py-3 text-gray-700">{app.businessOwner}</td>
-                <td className="px-4 py-3 text-gray-700">{app.itContact}</td>
-                <td className="px-4 py-3 text-gray-500">{app.department ?? '—'}</td>
-                <td className="px-4 py-3 text-gray-500">{app.hoursOfOperation}</td>
+                <td className="px-4 py-3 text-gray-700">{app.vendorName}</td>
+                <td className="px-4 py-3 text-gray-700">{app.tmrsBusinessOwner}</td>
+                <td className="px-4 py-3 text-gray-700">{app.tmrsTechnicalContact}</td>
+                <td className="px-4 py-3 text-gray-500">{resolve(configMaps.department, app.department)}</td>
+                <td className="px-4 py-3 text-gray-500">{resolve(configMaps.serviceHours, app.serviceHours)}</td>
+                <td className="px-4 py-3 text-gray-500">{app.businessCriticality ?? '—'}</td>
                 <td className="px-4 py-3 text-gray-500">{app.renewalDate ?? '—'}</td>
                 <td className="px-4 py-3">
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${app.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
@@ -155,7 +237,7 @@ export default function CatalogPage() {
       </div>
 
       {selected && (
-        <AppDetailModal app={selected} onClose={() => setSelected(null)} onChanged={() => { setSelected(null); load(); }} />
+        <AppDetailModal app={selected} configMaps={configMaps} onClose={() => setSelected(null)} onChanged={() => { setSelected(null); load(); }} />
       )}
       {adding && (
         <AppFormModal onClose={() => setAdding(false)} onSaved={() => { setAdding(false); load(); }} />

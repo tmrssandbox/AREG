@@ -6,14 +6,21 @@ export interface App {
   appId: string;
   name: string;
   description: string;
-  vendor: string;
-  itContact: string;
-  businessOwner: string;
-  department?: string;
-  hoursOfOperation: string;
-  status: 'active' | 'deleted';
+  vendorName: string;
+  tmrsBusinessOwner: string;
+  tmrsBusinessContact?: string;
+  tmrsTechnicalContact: string;
+  vendorBusinessContact?: string;
+  vendorTechnicalContact?: string;
+  serviceHours: string;       // config value ID
+  serviceLevel: string;       // config value ID
+  targetFeatureUtilization?: number;
+  featureUtilizationStatus?: number;
+  businessCriticality?: 'Critical' | 'High' | 'Medium' | 'Low';
+  department?: string;        // config value ID
   renewalDate?: string;
   notes?: string;
+  status: 'active' | 'deleted';
   createdBy: string;
   createdAt: string;
   modifiedBy?: string;
@@ -26,6 +33,24 @@ export interface AuditEntry {
   timestamp: string;
   diff?: Record<string, { old: unknown; new: unknown }>;
 }
+
+// Config value shapes
+export interface ConfigValue {
+  id: string;
+  label: string;
+  sortOrder: number;
+}
+
+export interface ServiceHoursValue extends ConfigValue {
+  definition: string;
+  weeklyHours: number;
+}
+
+export interface ServiceLevelValue extends ConfigValue {
+  percentage: number;
+}
+
+// DepartmentValue uses the base ConfigValue shape
 
 async function authHeaders(): Promise<Record<string, string>> {
   const session = await fetchAuthSession();
@@ -50,6 +75,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const api = {
+  // Apps
   listApps:    (params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
     return request<{ items: App[] }>('GET', `/apps${qs}`);
@@ -62,4 +88,14 @@ export const api = {
   restoreApp:   (id: string) => request<void>('POST', `/apps/${id}/restore`),
   getAudit:     (id: string) => request<{ entries: AuditEntry[] }>('GET', `/audit/${id}`),
   deleteMe:     () => request<void>('DELETE', '/users/me'),
+
+  // Config lookups
+  getConfig:          (category: string) => request<ConfigValue[]>('GET', `/config/${category}`),
+  addConfigValue:     (category: string, body: Record<string, unknown>) =>
+                        request<ConfigValue>('POST', `/config/${category}`, body),
+  updateConfigValue:  (category: string, id: string, body: Record<string, unknown>) =>
+                        request<ConfigValue>('PUT', `/config/${category}/values/${id}`, body),
+  deleteConfigValue:  (category: string, id: string) =>
+                        request<void>('DELETE', `/config/${category}/values/${id}`),
+  seedConfig:         () => request<{ seeded: string[]; skipped: string[] }>('POST', '/config/seed'),
 };

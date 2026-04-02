@@ -45,9 +45,9 @@ export default function DashboardPage() {
   const renewals  = active.filter(a => { const d = daysUntil(a.renewalDate); return d !== null && d <= 90; });
   const urgent    = active.filter(a => { const d = daysUntil(a.renewalDate); return d !== null && d <= 30; });
 
-  // Apps by IT Contact
+  // Apps by Technical Contact
   const byContact = active.reduce<Record<string, number>>((acc, a) => {
-    acc[a.itContact] = (acc[a.itContact] ?? 0) + 1;
+    acc[a.tmrsTechnicalContact] = (acc[a.tmrsTechnicalContact] ?? 0) + 1;
     return acc;
   }, {});
 
@@ -92,7 +92,7 @@ export default function DashboardPage() {
 
         {/* By IT Contact */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <h2 className="font-semibold text-gray-700 mb-3">Apps by IT Contact</h2>
+          <h2 className="font-semibold text-gray-700 mb-3">Apps by Technical Contact</h2>
           {Object.keys(byContact).length === 0
             ? <p className="text-sm text-gray-400">No apps</p>
             : <div className="space-y-1.5">

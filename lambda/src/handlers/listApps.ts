@@ -1,9 +1,12 @@
 import { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from 'aws-lambda';
-import { QueryCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLE_APPS } from '../lib/dynamo';
 import { ok } from '../lib/response';
 
-const FILTERABLE = ['vendor', 'itContact', 'businessOwner', 'department', 'hoursOfOperation'] as const;
+const FILTERABLE = [
+  'vendorName', 'tmrsTechnicalContact', 'tmrsBusinessOwner',
+  'serviceHours', 'serviceLevel', 'department', 'businessCriticality',
+] as const;
 
 function stripKeys(item: Record<string, unknown>): Record<string, unknown> {
   const { PK, SK, GSI1PK, GSI1SK, ...rest } = item;
@@ -18,7 +21,6 @@ export async function listApps(
   const limit = qs['limit'] ? parseInt(qs['limit'], 10) : 100;
   const nextToken = qs['nextToken'];
 
-  // Build filter expressions for optional field filters
   const filterParts: string[] = [];
   const exprNames: Record<string, string> = {};
   const exprValues: Record<string, unknown> = {};
@@ -35,7 +37,6 @@ export async function listApps(
 
   const filterExpr = filterParts.length > 0 ? filterParts.join(' AND ') : undefined;
 
-  // Query GSI1 by status
   const exclusiveStartKey = nextToken
     ? JSON.parse(Buffer.from(nextToken, 'base64').toString('utf8'))
     : undefined;
@@ -50,8 +51,8 @@ export async function listApps(
     },
     ...(Object.keys(exprNames).length > 0 ? { ExpressionAttributeNames: exprNames } : {}),
     ...(filterExpr ? { FilterExpression: filterExpr } : {}),
-    Limit:                    limit,
-    ExclusiveStartKey:        exclusiveStartKey,
+    Limit:             limit,
+    ExclusiveStartKey: exclusiveStartKey,
   }));
 
   const items = (result.Items ?? []).map(item => stripKeys(item as Record<string, unknown>));

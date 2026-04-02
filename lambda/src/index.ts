@@ -6,6 +6,7 @@ import { updateApp }     from './handlers/updateApp';
 import { deleteApp, restoreApp } from './handlers/deleteApp';
 import { getAudit }      from './handlers/getAudit';
 import { importApps }    from './handlers/importApps';
+import { getConfig, addConfigValue, updateConfigValue, deleteConfigValue, seedConfig } from './handlers/config';
 import { recordSignIn, deleteMe } from './handlers/users';
 import { preSignUp } from './handlers/preSignUp';
 
@@ -101,6 +102,25 @@ export async function handler(event: LambdaEvent): Promise<APIGatewayProxyResult
   // /audit/{appId}
   const auditMatch = path.match(/^\/audit\/([^/]+)$/);
   if (auditMatch && method === 'GET') return getAudit(event, auditMatch[1]);
+
+  // /config/seed
+  if (method === 'POST' && path === '/config/seed') return seedConfig(event);
+
+  // /config/:category
+  const configMatch = path.match(/^\/config\/([^/]+)$/);
+  if (configMatch) {
+    const category = configMatch[1];
+    if (method === 'GET')  return getConfig(event, category);
+    if (method === 'POST') return addConfigValue(event, category);
+  }
+
+  // /config/:category/values/:id
+  const configValueMatch = path.match(/^\/config\/([^/]+)\/values\/([^/]+)$/);
+  if (configValueMatch) {
+    const [, category, id] = configValueMatch;
+    if (method === 'PUT')    return updateConfigValue(event, category, id);
+    if (method === 'DELETE') return deleteConfigValue(event, category, id);
+  }
 
   return resp(404, { message: 'Not found' });
 }

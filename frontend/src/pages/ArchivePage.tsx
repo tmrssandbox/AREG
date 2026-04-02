@@ -41,7 +41,7 @@ export default function ArchivePage() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
-              {['Application', 'Vendor', 'IT Contact', 'Business Owner', 'Deleted', ''].map(h => (
+              {['Application', 'Vendor', 'Technical Contact', 'Business Owner', 'Deleted', ''].map(h => (
                 <th key={h} className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -53,9 +53,9 @@ export default function ArchivePage() {
             {apps.map(app => (
               <tr key={app.appId} className="border-b border-gray-50">
                 <td className="px-4 py-3 font-medium text-gray-700">{app.name}</td>
-                <td className="px-4 py-3 text-gray-600">{app.vendor}</td>
-                <td className="px-4 py-3 text-gray-600">{app.itContact}</td>
-                <td className="px-4 py-3 text-gray-600">{app.businessOwner}</td>
+                <td className="px-4 py-3 text-gray-600">{app.vendorName}</td>
+                <td className="px-4 py-3 text-gray-600">{app.tmrsTechnicalContact}</td>
+                <td className="px-4 py-3 text-gray-600">{app.tmrsBusinessOwner}</td>
                 <td className="px-4 py-3 text-gray-500 text-xs">{app.modifiedAt?.slice(0, 10) ?? '—'}</td>
                 <td className="px-4 py-3">
                   <button

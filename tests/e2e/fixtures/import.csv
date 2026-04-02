@@ -1,2 +1,2 @@
-name,description,vendor,itContact,businessOwner,hoursOfOperation,department,renewalDate,notes
-AREG_TEST_IMPORT,Smoke test import,TestVendor,it@test.local,owner@test.local,9-5 M-F,IT,2027-01-01,E2E fixture
+"name","description","Vendor Name","TMRS Business Owner","TMRS Technical Contact","Service Hours","Service Level","TMRS Business Contact","Vendor Business Contact","Vendor Technical Contact","Department","Business Criticality","Renewal Date","Notes","Target Feature Utilization","Feature Utilization Status"
+"AREG_TEST_IMPORT","Imported via E2E smoke test","ImportVendor","Import Owner","Import Tech","Business Hours","99.9%","Import Contact","Vendor BizContact","Vendor TechContact","IS","High","2027-12-31","Imported by smoke test","75","50"

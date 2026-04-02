@@ -5,8 +5,13 @@ import { writeAudit, Diff } from '../lib/auditLog';
 import { getCaller } from '../lib/auth';
 import { ok, badRequest, forbidden, notFound } from '../lib/response';
 
-const UPDATABLE = ['name', 'description', 'vendor', 'itContact', 'businessOwner',
-                   'hoursOfOperation', 'department', 'renewalDate', 'notes'] as const;
+const UPDATABLE = [
+  'name', 'description', 'vendorName', 'tmrsBusinessOwner', 'tmrsTechnicalContact',
+  'tmrsBusinessContact', 'vendorBusinessContact', 'vendorTechnicalContact',
+  'serviceHours', 'serviceLevel', 'department', 'businessCriticality',
+  'targetFeatureUtilization', 'featureUtilizationStatus',
+  'renewalDate', 'notes',
+] as const;
 
 export async function updateApp(
   event: APIGatewayProxyEventV2WithJWTAuthorizer,
@@ -31,22 +36,41 @@ export async function updateApp(
   const existing = result.Item as Record<string, unknown>;
   const caller   = getCaller(event);
 
-  // Viewers cannot write; editors may only update records they own
   if (caller.role === 'viewer') return forbidden('Viewers cannot update records');
   if (caller.role === 'editor') {
-    const isOwner = existing['itContact'] === caller.email ||
-                    existing['businessOwner'] === caller.email;
+    const isOwner = existing['tmrsTechnicalContact'] === caller.email ||
+                    existing['tmrsBusinessOwner'] === caller.email;
     if (!isOwner) return forbidden('Editors may only update their own records');
   }
 
-  // Build diff and updated item
+  // Validate optional percentage fields
+  for (const pctField of ['targetFeatureUtilization', 'featureUtilizationStatus']) {
+    const val = body[pctField];
+    if (val !== undefined && val !== null && val !== '') {
+      const n = Number(val);
+      if (isNaN(n) || n < 0 || n > 100) return badRequest(`${pctField} must be a number between 0 and 100`);
+    }
+  }
+
   const diff: Diff = {};
   const updated: Record<string, unknown> = { ...existing };
 
   for (const field of UPDATABLE) {
-    if (field in body && body[field] !== existing[field]) {
-      diff[field] = { old: existing[field], new: body[field] };
-      updated[field] = body[field];
+    if (!(field in body)) continue;
+
+    // Normalize percentage fields to number or undefined
+    let newVal: unknown = body[field];
+    if (field === 'targetFeatureUtilization' || field === 'featureUtilizationStatus') {
+      newVal = (newVal !== undefined && newVal !== null && newVal !== '') ? Number(newVal) : undefined;
+    }
+
+    if (newVal !== existing[field]) {
+      diff[field] = { old: existing[field], new: newVal };
+      if (newVal !== undefined) {
+        updated[field] = newVal;
+      } else {
+        delete updated[field];
+      }
     }
   }
 
@@ -54,7 +78,6 @@ export async function updateApp(
   updated['modifiedBy'] = caller.email;
   updated['modifiedAt'] = now;
 
-  // Strip undefined values before writing (DynamoDB lib rejects them)
   const clean = Object.fromEntries(Object.entries(updated).filter(([, v]) => v !== undefined));
   await ddb.send(new PutCommand({ TableName: TABLE_APPS, Item: clean }));
   if (Object.keys(diff).length > 0) {

@@ -55,9 +55,20 @@ export class AregStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
+    // AREG-42: Admin-managed lookup values (Service Hours, Service Level, Department)
+    // PK=CONFIG#category, SK=VALUE#id
+    const configTable = new dynamodb.Table(this, 'AregDdbConfig', {
+      tableName: 'areg-ddb-config',
+      partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
+      sortKey:      { name: 'SK', type: dynamodb.AttributeType.STRING },
+      billingMode:  dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
     // Opt into shared APPS backup plan (nightly, 30-day retention)
     cdk.Tags.of(appsTable).add('ManagedBackup', 'true');
     cdk.Tags.of(auditTable).add('ManagedBackup', 'true');
+    cdk.Tags.of(configTable).add('ManagedBackup', 'true');
 
     // Export table names for Lambda env vars
     new ssm.StringParameter(this, 'TableAppsName', {
@@ -184,6 +195,7 @@ export class AregStack extends cdk.Stack {
       environment: {
         TABLE_APPS:        'areg-ddb-apps',
         TABLE_AUDIT:       'areg-ddb-audit',
+        TABLE_CONFIG:      'areg-ddb-config',
         ADMIN_APPS_TABLE:  'tmrs-admin-ddb-apps',
         REGION:            this.region,
         USER_POOL_ID:      'us-east-2_Ts0PtOaEc',  // stable — retained pool, see /areg/cognito-user-pool-id
@@ -192,9 +204,10 @@ export class AregStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(29),
     });
 
-    // Grant Lambda read/write on both tables
+    // Grant Lambda read/write on all tables
     appsTable.grantReadWriteData(apiLambda);
     auditTable.grantReadWriteData(apiLambda);
+    configTable.grantReadWriteData(apiLambda);
 
     // Pre-signup trigger — enforces allowed_domains setting
     userPool.addTrigger(cognito.UserPoolOperation.PRE_SIGN_UP, apiLambda);
