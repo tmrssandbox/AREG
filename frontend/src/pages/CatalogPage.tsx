@@ -41,6 +41,8 @@ export default function CatalogPage() {
   const [selected,      setSelected]      = useState<App | null>(null);
   const [selectedTab,   setSelectedTab]   = useState<'detail' | 'contracts' | 'audit'>('detail');
   const [adding,        setAdding]        = useState(false);
+  const [sortKey,  setSortKey]  = useState<string>('name');
+  const [sortDir,  setSortDir]  = useState<'asc' | 'desc'>('asc');
   const [configMaps, setConfigMaps] = useState<ConfigMaps>({
     serviceHours: new Map(), serviceLevel: new Map(), department: new Map(),
   });
@@ -103,6 +105,37 @@ export default function CatalogPage() {
     if (deptFilter) result = result.filter(a => a.department   === deptFilter);
     return result;
   }, [apps, search, filters, shFilter, slFilter, deptFilter]);
+
+  // Column definitions: label → sort accessor
+  const COLUMNS: { label: string; key: string; value: (a: App) => string }[] = [
+    { label: 'Application',       key: 'name',                value: a => a.name ?? '' },
+    { label: 'Department',        key: 'department',          value: a => configMaps.department.get(a.department ?? '') ?? a.department ?? '' },
+    { label: 'Business Owner',    key: 'tmrsBusinessOwner',   value: a => a.tmrsBusinessOwner ?? '' },
+    { label: 'Technical Contact', key: 'tmrsTechnicalContact',value: a => a.tmrsTechnicalContact ?? '' },
+    { label: 'Service Hours',     key: 'serviceHours',        value: a => configMaps.serviceHours.get(a.serviceHours ?? '') ?? a.serviceHours ?? '' },
+    { label: 'Service Level',     key: 'serviceLevel',        value: a => configMaps.serviceLevel.get(a.serviceLevel ?? '') ?? a.serviceLevel ?? '' },
+    { label: 'Criticality',       key: 'businessCriticality', value: a => a.businessCriticality ?? '' },
+    { label: 'Renewal Date',      key: 'renewalDate',         value: a => a.renewalDate ?? '' },
+  ];
+
+  const sorted = useMemo(() => {
+    const col = COLUMNS.find(c => c.key === sortKey);
+    if (!col) return filtered;
+    return [...filtered].sort((a, b) => {
+      const av = col.value(a).toLowerCase();
+      const bv = col.value(b).toLowerCase();
+      // Push blanks to the bottom regardless of direction
+      if (!av && bv) return 1;
+      if (av && !bv) return -1;
+      const cmp = av.localeCompare(bv);
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [filtered, sortKey, sortDir, configMaps]);
+
+  function handleSort(key: string) {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  }
 
   function clearFilter(key: TextFilterField) {
     setFilters(f => { const next = { ...f }; delete next[key]; return next; });
@@ -215,16 +248,24 @@ export default function CatalogPage() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
-              {['Application', 'Department', 'Business Owner', 'Technical Contact', 'Service Hours', 'Service Level', 'Criticality', 'Renewal Date'].map(h => (
-                <th key={h} className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">{h}</th>
+              {COLUMNS.map(col => (
+                <th key={col.key} className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">
+                  <button onClick={() => handleSort(col.key)}
+                    className="flex items-center gap-1 hover:text-indigo-600 transition-colors">
+                    {col.label}
+                    <span className="text-xs w-3 inline-block text-center">
+                      {sortKey === col.key ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </span>
+                  </button>
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && (
+            {sorted.length === 0 && (
               <tr><td colSpan={8} className="text-center py-8 text-gray-400">No records found</td></tr>
             )}
-            {filtered.map(app => (
+            {sorted.map(app => (
               <tr key={app.appId} onClick={() => { setSelectedTab('detail'); setSelected(app); }}
                 className="border-b border-gray-50 hover:bg-indigo-50 cursor-pointer transition-colors">
                 <td className="px-4 py-3 font-medium text-indigo-700">{app.name}</td>
