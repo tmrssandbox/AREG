@@ -72,6 +72,15 @@ export class AregStack extends cdk.Stack {
       selfSignUpEnabled: true,
       signInAliases: { email: true },
       autoVerify: { email: true },
+      // Use SES so verification emails come from no-reply@tmrs.studio instead of
+      // Cognito's default domain (no-reply@verificationemail.com), which is blocked
+      // by many corporate mail servers. CloudFormation can't change EmailSendingAccount
+      // after pool creation, so the live pool was updated via CLI (AREG-37).
+      email: cognito.UserPoolEmail.withSES({
+        sesRegion: 'us-east-1',
+        fromEmail: 'no-reply@tmrs.studio',
+        sesVerifiedDomain: 'tmrs.studio',
+      }),
       passwordPolicy: {
         minLength: 8,
         requireUppercase: true,
