@@ -17,11 +17,11 @@ function buildMap(values: ConfigValue[]): Map<string, string> {
 }
 
 // Filterable free-text fields (derived from app data)
-const TEXT_FILTER_FIELDS = ['vendorName', 'tmrsBusinessOwner', 'tmrsTechnicalContact', 'businessCriticality'] as const;
+const TEXT_FILTER_FIELDS = ['tmrsBusinessOwner', 'tmrsTechnicalContact', 'businessCriticality'] as const;
 type TextFilterField = typeof TEXT_FILTER_FIELDS[number];
 
 const TEXT_LABELS: Record<TextFilterField, string> = {
-  vendorName: 'Vendor', tmrsBusinessOwner: 'Business Owner',
+  tmrsBusinessOwner: 'Business Owner',
   tmrsTechnicalContact: 'Technical Contact', businessCriticality: 'Criticality',
 };
 
@@ -139,17 +139,25 @@ export default function CatalogPage() {
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
         />
         <div className="flex flex-wrap gap-2">
-          {/* Free-text field filters */}
-          {TEXT_FILTER_FIELDS.map(f => (
-            <select key={f} value={filters[f] ?? ''}
-              onChange={e => setFilters(prev => ({ ...prev, [f]: e.target.value || undefined }))}
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
-              <option value="">All {TEXT_LABELS[f]}</option>
-              {(textOptions[f] ?? []).map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
-          ))}
+          {/* Filters in table-column order: Dept, Owner, Contact, Hours, Level, Criticality */}
+          <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)}
+            className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <option value="">All Departments</option>
+            {departmentList.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+          </select>
 
-          {/* Config-backed filters */}
+          <select value={filters['tmrsBusinessOwner'] ?? ''} onChange={e => setFilters(prev => ({ ...prev, tmrsBusinessOwner: e.target.value || undefined }))}
+            className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <option value="">All Business Owners</option>
+            {(textOptions['tmrsBusinessOwner'] ?? []).map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+
+          <select value={filters['tmrsTechnicalContact'] ?? ''} onChange={e => setFilters(prev => ({ ...prev, tmrsTechnicalContact: e.target.value || undefined }))}
+            className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <option value="">All Technical Contacts</option>
+            {(textOptions['tmrsTechnicalContact'] ?? []).map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+
           <select value={shFilter} onChange={e => setShFilter(e.target.value)}
             className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
             <option value="">All Service Hours</option>
@@ -162,10 +170,10 @@ export default function CatalogPage() {
             {serviceLevelList.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
           </select>
 
-          <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)}
+          <select value={filters['businessCriticality'] ?? ''} onChange={e => setFilters(prev => ({ ...prev, businessCriticality: e.target.value || undefined }))}
             className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
-            <option value="">All Departments</option>
-            {departmentList.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+            <option value="">All Criticality</option>
+            {(textOptions['businessCriticality'] ?? []).map(v => <option key={v} value={v}>{v}</option>)}
           </select>
         </div>
 
