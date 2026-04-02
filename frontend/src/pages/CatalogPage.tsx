@@ -215,14 +215,14 @@ export default function CatalogPage() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
-              {['Application', 'Department', 'Business Owner', 'Technical Contact', 'Service Hours', 'Service Level', 'Criticality', 'Status', 'Renewal Date'].map(h => (
+              {['Application', 'Department', 'Business Owner', 'Technical Contact', 'Service Hours', 'Service Level', 'Criticality', 'Renewal Date'].map(h => (
                 <th key={h} className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
-              <tr><td colSpan={9} className="text-center py-8 text-gray-400">No records found</td></tr>
+              <tr><td colSpan={8} className="text-center py-8 text-gray-400">No records found</td></tr>
             )}
             {filtered.map(app => (
               <tr key={app.appId} onClick={() => { setSelectedTab('detail'); setSelected(app); }}
@@ -234,11 +234,6 @@ export default function CatalogPage() {
                 <td className="px-4 py-3 text-gray-500">{resolve(configMaps.serviceHours, app.serviceHours)}</td>
                 <td className="px-4 py-3 text-gray-500">{resolve(configMaps.serviceLevel, app.serviceLevel)}</td>
                 <td className="px-4 py-3 text-gray-500">{app.businessCriticality ?? '—'}</td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${app.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                    {app.status}
-                  </span>
-                </td>
                 <td className="px-4 py-3 text-gray-500">{app.renewalDate ?? '—'}</td>
               </tr>
             ))}
