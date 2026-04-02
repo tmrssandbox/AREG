@@ -38,6 +38,11 @@ async function cognitoAuth(username: string, password: string): Promise<string> 
 
 async function getToken(): Promise<string> {
   if (apiToken) return apiToken;
+  // Use pre-obtained token if provided — avoids USER_PASSWORD_AUTH rate limiting
+  if (process.env.AREG_API_TOKEN) {
+    apiToken = process.env.AREG_API_TOKEN;
+    return apiToken;
+  }
   apiToken = await cognitoAuth(EMAIL, PASSWORD);
   return apiToken;
 }
@@ -150,8 +155,15 @@ test('add new application record', async () => {
   await selects.nth(1).selectOption({ index: 1 }); // serviceLevel — first real option
 
   await modal.locator('button[type="submit"]').click();
-  await page.waitForSelector(`td:has-text("${APP_NAME}"), tr:has-text("${APP_NAME}")`, { timeout: 10_000 });
-  await expect(page.locator(`text=${APP_NAME}`).first()).toBeVisible();
+
+  // After creation the detail modal opens on the Contracts tab — close it
+  const detailModal = page.locator('.modal-overlay');
+  await detailModal.waitFor({ timeout: 10_000 });
+  await expect(detailModal.locator('.modal-tab.active')).toContainText('Contracts', { timeout: 8_000 });
+  await detailModal.locator('button.modal-close').click();
+  await expect(page.locator('.modal-overlay')).not.toBeVisible({ timeout: 5_000 });
+
+  await expect(page.locator(`text=${APP_NAME}`).first()).toBeVisible({ timeout: 8_000 });
 });
 
 // ── Catalog — search + filter ─────────────────────────────────────────────────
@@ -335,6 +347,110 @@ test('profile page shows mfa-option card with label', async () => {
   await page.goto('/profile');
   await expect(page.locator('.mfa-option')).toBeVisible({ timeout: 5_000 });
   await expect(page.locator('.mfa-option-label')).toContainText('Authenticator app');
+});
+
+// ── Contracts API ─────────────────────────────────────────────────────────────
+
+test('contracts: full upload → confirm → list → download-url → delete flow', async () => {
+  const token = await getToken();
+
+  // Create a temp app to attach a contract to
+  const createRes = await fetch(`${BASE}/apps`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: 'CONTRACT_TEST_APP', description: 'temp for contract test',
+      vendorName: 'vendor', tmrsBusinessOwner: 'owner', tmrsTechnicalContact: 'tech',
+      serviceHours: serviceHoursId, serviceLevel: serviceLevelId,
+    }),
+  });
+  expect(createRes.status).toBe(201);
+  const createdApp = await createRes.json() as { appId?: string };
+  const appId = createdApp.appId ?? '';
+  expect(appId).toBeTruthy();
+
+  try {
+    // Step 1: get upload URL
+    const urlRes = await fetch(`${BASE}/apps/${appId}/contracts/upload-url`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: 'test-contract.pdf', contentType: 'application/pdf', sizeBytes: 1024, description: 'E2E test doc' }),
+    });
+    expect(urlRes.status).toBe(201);
+    const { docId, uploadUrl } = await urlRes.json() as { docId: string; uploadUrl: string };
+    expect(docId).toBeTruthy();
+    expect(uploadUrl).toContain('amazonaws.com');
+
+    // Step 2: upload a tiny PDF to S3 via presigned URL
+    const pdfBytes = Buffer.from('%PDF-1.4 smoke test');
+    const s3Res = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/pdf' },
+      body: pdfBytes,
+    });
+    expect(s3Res.ok).toBe(true);
+
+    // Step 3: confirm upload
+    const confirmRes = await fetch(`${BASE}/apps/${appId}/contracts/${docId}/confirm`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(confirmRes.status).toBe(200);
+
+    // Step 4: list contracts
+    const listRes = await fetch(`${BASE}/apps/${appId}/contracts`, { headers: { Authorization: `Bearer ${token}` } });
+    expect(listRes.status).toBe(200);
+    const list = await listRes.json() as { items: { docId: string }[] };
+    expect(list.items.some(d => d.docId === docId)).toBe(true);
+
+    // Step 5: get download URL
+    const dlRes = await fetch(`${BASE}/apps/${appId}/contracts/${docId}/download-url`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.status).toBe(200);
+    const { downloadUrl } = await dlRes.json() as { downloadUrl: string };
+    expect(downloadUrl).toContain('amazonaws.com');
+
+    // Step 6: delete the contract
+    const delRes = await fetch(`${BASE}/apps/${appId}/contracts/${docId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(delRes.status).toBe(200);
+
+    // Verify gone from list
+    const listAfterRes = await fetch(`${BASE}/apps/${appId}/contracts`, { headers: { Authorization: `Bearer ${token}` } });
+    const listAfter = await listAfterRes.json() as { items: { docId: string }[] };
+    expect(listAfter.items.some(d => d.docId === docId)).toBe(false);
+  } finally {
+    // Cleanup app
+    await fetch(`${BASE}/apps/${appId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+  }
+});
+
+test('viewer cannot upload contracts via API', async () => {
+  const adminToken = await getToken();
+  const createRes = await fetch(`${BASE}/apps`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: 'CONTRACT_VIEWER_TEST', description: 'temp',
+      vendorName: 'v', tmrsBusinessOwner: 'o', tmrsTechnicalContact: 't',
+      serviceHours: serviceHoursId, serviceLevel: serviceLevelId,
+    }),
+  });
+  const { appId } = await createRes.json() as { appId: string };
+  try {
+    const viewerToken = await cognitoAuth(VIEWER_EMAIL, PASSWORD);
+    const res = await fetch(`${BASE}/apps/${appId}/contracts/upload-url`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${viewerToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: 'blocked.pdf', contentType: 'application/pdf', sizeBytes: 100, description: '' }),
+    });
+    expect(res.status).toBe(403);
+  } finally {
+    await fetch(`${BASE}/apps/${appId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${adminToken}` } });
+  }
 });
 
 // ── DELETE /users/me ──────────────────────────────────────────────────────────

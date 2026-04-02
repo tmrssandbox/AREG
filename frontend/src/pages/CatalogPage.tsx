@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, App, ConfigValue, ServiceHoursValue, ServiceLevelValue } from '../lib/api';
+
 import { useAuth } from '../contexts/AuthContext';
 import AppDetailModal from '../components/AppDetailModal';
 import AppFormModal   from '../components/AppFormModal';
@@ -37,8 +38,9 @@ export default function CatalogPage() {
   const [shFilter,   setShFilter]   = useState('');
   const [slFilter,   setSlFilter]   = useState('');
   const [deptFilter, setDeptFilter] = useState('');
-  const [selected,   setSelected]   = useState<App | null>(null);
-  const [adding,     setAdding]     = useState(false);
+  const [selected,      setSelected]      = useState<App | null>(null);
+  const [selectedTab,   setSelectedTab]   = useState<'detail' | 'contracts' | 'audit'>('detail');
+  const [adding,        setAdding]        = useState(false);
   const [configMaps, setConfigMaps] = useState<ConfigMaps>({
     serviceHours: new Map(), serviceLevel: new Map(), department: new Map(),
   });
@@ -223,7 +225,7 @@ export default function CatalogPage() {
               <tr><td colSpan={9} className="text-center py-8 text-gray-400">No records found</td></tr>
             )}
             {filtered.map(app => (
-              <tr key={app.appId} onClick={() => setSelected(app)}
+              <tr key={app.appId} onClick={() => { setSelectedTab('detail'); setSelected(app); }}
                 className="border-b border-gray-50 hover:bg-indigo-50 cursor-pointer transition-colors">
                 <td className="px-4 py-3 font-medium text-indigo-700">{app.name}</td>
                 <td className="px-4 py-3 text-gray-500">{resolve(configMaps.department, app.department)}</td>
@@ -245,10 +247,16 @@ export default function CatalogPage() {
       </div>
 
       {selected && (
-        <AppDetailModal app={selected} configMaps={configMaps} onClose={() => setSelected(null)} onChanged={() => { setSelected(null); load(); }} />
+        <AppDetailModal app={selected} configMaps={configMaps} initialTab={selectedTab}
+          onClose={() => { setSelected(null); setSelectedTab('detail'); }}
+          onChanged={() => { setSelected(null); setSelectedTab('detail'); load(); }} />
       )}
       {adding && (
-        <AppFormModal onClose={() => setAdding(false)} onSaved={() => { setAdding(false); load(); }} />
+        <AppFormModal onClose={() => setAdding(false)} onSaved={(newApp) => {
+          setAdding(false);
+          load();
+          if (newApp) { setSelectedTab('contracts'); setSelected(newApp); }
+        }} />
       )}
     </div>
   );

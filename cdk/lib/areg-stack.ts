@@ -126,6 +126,22 @@ export class AregStack extends cdk.Stack {
       stringValue: appClient.userPoolClientId,
     });
 
+    // ── AREG-59: S3 bucket for contract document uploads ──────────────────────
+
+    const contractsBucket = new s3.Bucket(this, 'AregS3Contracts', {
+      bucketName: `areg-s3-contracts-${this.account}`,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      cors: [{
+        allowedMethods: [s3.HttpMethods.PUT, s3.HttpMethods.GET],
+        allowedOrigins: ['https://areg.tmrs.studio'],
+        allowedHeaders: ['*'],
+        maxAge: 3000,
+      }],
+    });
+    cdk.Tags.of(contractsBucket).add('Project', 'AREG');
+
     // ── AREG-8: S3 + CloudFront for frontend ──────────────────────────────────
 
     const frontendBucket = new s3.Bucket(this, 'AregS3Frontend', {
@@ -197,6 +213,7 @@ export class AregStack extends cdk.Stack {
         TABLE_AUDIT:       'areg-ddb-audit',
         TABLE_CONFIG:      'areg-ddb-config',
         ADMIN_APPS_TABLE:  'tmrs-admin-ddb-apps',
+        BUCKET_CONTRACTS:  contractsBucket.bucketName,
         REGION:            this.region,
         USER_POOL_ID:      'us-east-2_Ts0PtOaEc',  // stable — retained pool, see /areg/cognito-user-pool-id
         DEPLOY_VERSION:    execSync('git describe --tags --abbrev=0').toString().trim().replace(/^v/, ''),
@@ -208,6 +225,9 @@ export class AregStack extends cdk.Stack {
     appsTable.grantReadWriteData(apiLambda);
     auditTable.grantReadWriteData(apiLambda);
     configTable.grantReadWriteData(apiLambda);
+
+    // AREG-59: Grant Lambda access to contracts bucket (presigned URL generation + delete)
+    contractsBucket.grantReadWrite(apiLambda);
 
     // Pre-signup trigger — enforces allowed_domains setting
     userPool.addTrigger(cognito.UserPoolOperation.PRE_SIGN_UP, apiLambda);

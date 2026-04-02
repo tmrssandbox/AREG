@@ -7,6 +7,7 @@ import { deleteApp, restoreApp } from './handlers/deleteApp';
 import { getAudit }      from './handlers/getAudit';
 import { importApps }    from './handlers/importApps';
 import { getConfig, addConfigValue, updateConfigValue, deleteConfigValue, seedConfig } from './handlers/config';
+import { listContracts, getUploadUrl, confirmUpload, getDownloadUrl, deleteContract } from './handlers/contracts';
 import { recordSignIn, deleteMe } from './handlers/users';
 import { preSignUp } from './handlers/preSignUp';
 
@@ -98,6 +99,26 @@ export async function handler(event: LambdaEvent): Promise<APIGatewayProxyResult
   // /apps/{id}/restore
   const restoreMatch = path.match(/^\/apps\/([^/]+)\/restore$/);
   if (restoreMatch && method === 'POST') return restoreApp(event, restoreMatch[1]);
+
+  // /apps/{id}/contracts/upload-url
+  const contractUploadMatch = path.match(/^\/apps\/([^/]+)\/contracts\/upload-url$/);
+  if (contractUploadMatch && method === 'POST') return getUploadUrl(event, contractUploadMatch[1]);
+
+  // /apps/{id}/contracts/{docId}/confirm
+  const contractConfirmMatch = path.match(/^\/apps\/([^/]+)\/contracts\/([^/]+)\/confirm$/);
+  if (contractConfirmMatch && method === 'POST') return confirmUpload(event, contractConfirmMatch[1], contractConfirmMatch[2]);
+
+  // /apps/{id}/contracts/{docId}/download-url
+  const contractDownloadMatch = path.match(/^\/apps\/([^/]+)\/contracts\/([^/]+)\/download-url$/);
+  if (contractDownloadMatch && method === 'GET') return getDownloadUrl(event, contractDownloadMatch[1], contractDownloadMatch[2]);
+
+  // /apps/{id}/contracts/{docId}
+  const contractDocMatch = path.match(/^\/apps\/([^/]+)\/contracts\/([^/]+)$/);
+  if (contractDocMatch && method === 'DELETE') return deleteContract(event, contractDocMatch[1], contractDocMatch[2]);
+
+  // /apps/{id}/contracts
+  const contractsMatch = path.match(/^\/apps\/([^/]+)\/contracts$/);
+  if (contractsMatch && method === 'GET') return listContracts(event, contractsMatch[1]);
 
   // /audit/{appId}
   const auditMatch = path.match(/^\/audit\/([^/]+)$/);

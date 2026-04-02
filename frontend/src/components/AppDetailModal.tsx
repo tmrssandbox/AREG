@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { api, App, AuditEntry } from '../lib/api';
+import { useEffect, useRef, useState } from 'react';
+import { api, App, AuditEntry, ContractDoc } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import AppFormModal from './AppFormModal';
 import './Modal.css';
@@ -15,6 +15,7 @@ interface Props {
   configMaps: ConfigMaps;
   onClose: () => void;
   onChanged: () => void;
+  initialTab?: 'detail' | 'audit' | 'contracts';
 }
 
 function Row({ label, value }: { label: string; value?: string | null }) {
@@ -31,15 +32,26 @@ function pct(val?: number | null): string | undefined {
   return `${val}%`;
 }
 
-export default function AppDetailModal({ app, configMaps, onClose, onChanged }: Props) {
+export default function AppDetailModal({ app, configMaps, onClose, onChanged, initialTab = 'detail' }: Props) {
   const { isAdmin, isEditor, email } = useAuth();
-  const [tab,         setTab]         = useState<'detail' | 'audit'>('detail');
+  const [tab,         setTab]         = useState<'detail' | 'audit' | 'contracts'>(initialTab);
   const [audit,       setAudit]       = useState<AuditEntry[]>([]);
   const [auditLoaded, setAuditLoaded] = useState(false);
   const [editing,     setEditing]     = useState(false);
   const [confirmDel,  setConfirmDel]  = useState(false);
   const [busy,        setBusy]        = useState(false);
   const [error,       setError]       = useState('');
+
+  // Contracts state
+  const [contracts,         setContracts]         = useState<ContractDoc[]>([]);
+  const [contractsLoaded,   setContractsLoaded]   = useState(false);
+  const [contractsError,    setContractsError]    = useState('');
+  const [uploading,         setUploading]         = useState(false);
+  const [uploadError,       setUploadError]       = useState('');
+  const [confirmDelDoc,     setConfirmDelDoc]      = useState<string | null>(null);
+  const [deletingDoc,       setDeletingDoc]        = useState(false);
+  const [uploadDesc,        setUploadDesc]         = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const canEdit = isAdmin || (isEditor && (
     app.tmrsTechnicalContact === email || app.tmrsBusinessOwner === email
@@ -49,7 +61,12 @@ export default function AppDetailModal({ app, configMaps, onClose, onChanged }: 
     if (tab === 'audit' && !auditLoaded) {
       api.getAudit(app.appId).then(r => { setAudit(r.entries); setAuditLoaded(true); });
     }
-  }, [tab, auditLoaded, app.appId]);
+    if (tab === 'contracts' && !contractsLoaded) {
+      api.listContracts(app.appId)
+        .then(r => { setContracts(r.items); setContractsLoaded(true); })
+        .catch(e => setContractsError((e as Error).message));
+    }
+  }, [tab, auditLoaded, contractsLoaded, app.appId]);
 
   async function handleDelete() {
     setBusy(true);
@@ -59,6 +76,58 @@ export default function AppDetailModal({ app, configMaps, onClose, onChanged }: 
       onClose();
     } catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
+  }
+
+  async function handleUpload(file: File) {
+    setUploading(true);
+    setUploadError('');
+    try {
+      const { docId, uploadUrl } = await api.getUploadUrl(app.appId, {
+        filename:    file.name,
+        contentType: file.type,
+        sizeBytes:   file.size,
+        description: uploadDesc,
+      });
+
+      // PUT directly to S3 via presigned URL — no auth header here
+      const s3Res = await fetch(uploadUrl, {
+        method:  'PUT',
+        headers: { 'Content-Type': file.type },
+        body:    file,
+      });
+      if (!s3Res.ok) throw new Error(`S3 upload failed (${s3Res.status})`);
+
+      const doc = await api.confirmUpload(app.appId, docId);
+      setContracts(prev => [doc, ...prev]);
+      setUploadDesc('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (e) {
+      setUploadError((e as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleDownload(docId: string) {
+    try {
+      const { downloadUrl } = await api.getDownloadUrl(app.appId, docId);
+      window.open(downloadUrl, '_blank', 'noopener');
+    } catch (e) {
+      setContractsError((e as Error).message);
+    }
+  }
+
+  async function handleDeleteDoc(docId: string) {
+    setDeletingDoc(true);
+    try {
+      await api.deleteContract(app.appId, docId);
+      setContracts(prev => prev.filter(d => d.docId !== docId));
+      setConfirmDelDoc(null);
+    } catch (e) {
+      setContractsError((e as Error).message);
+    } finally {
+      setDeletingDoc(false);
+    }
   }
 
   function resolveLabel(map: Map<string, string>, id?: string): string | undefined {
@@ -82,10 +151,12 @@ export default function AppDetailModal({ app, configMaps, onClose, onChanged }: 
         </div>
 
         <div className="modal-tabs">
-          {(['detail', 'audit'] as const).map(t => (
+          {(['detail', 'contracts', 'audit'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`modal-tab${tab === t ? ' active' : ''}`}>
-              {t.charAt(0).toUpperCase() + t.slice(1)}
+              {t === 'contracts'
+                ? `Contracts${contracts.length > 0 ? ` (${contracts.length})` : ''}`
+                : t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
           ))}
         </div>
@@ -113,6 +184,75 @@ export default function AppDetailModal({ app, configMaps, onClose, onChanged }: 
               <Row label="Created At"                value={app.createdAt?.slice(0, 10)} />
               <Row label="Modified By"               value={app.modifiedBy} />
               <Row label="Modified At"               value={app.modifiedAt?.slice(0, 10)} />
+            </div>
+          )}
+
+          {tab === 'contracts' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+
+              {/* Upload area — admin/editor only */}
+              {(isAdmin || isEditor) && (
+                <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                  <p style={{ fontSize: 'var(--text-xs)', fontWeight: 500, color: 'var(--color-text-muted)', margin: 0 }}>Upload Document</p>
+                  <input
+                    type="text"
+                    placeholder="Description (optional)"
+                    value={uploadDesc}
+                    onChange={e => setUploadDesc(e.target.value)}
+                    style={{ padding: 'var(--space-2) var(--space-3)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', color: 'var(--color-text)', background: 'var(--color-surface)', fontFamily: 'var(--font-body)' }}
+                  />
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                      style={{ fontSize: 'var(--text-sm)', flex: 1 }}
+                      onChange={e => { if (e.target.files?.[0]) handleUpload(e.target.files[0]); }}
+                      disabled={uploading}
+                    />
+                    {uploading && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Uploading…</span>}
+                  </div>
+                  {uploadError && <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-error)', margin: 0 }}>{uploadError}</p>}
+                </div>
+              )}
+
+              {/* Document list */}
+              {contractsError && <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-error)', margin: 0 }}>{contractsError}</p>}
+              {!contractsLoaded && <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Loading…</p>}
+              {contractsLoaded && contracts.length === 0 && (
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>No documents uploaded yet.</p>
+              )}
+              {contracts.map(doc => (
+                <div key={doc.docId} style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.filename}</div>
+                      {doc.description && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{doc.description}</div>}
+                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 'var(--space-1)' }}>
+                        {doc.uploadedBy} · {doc.uploadedAt.slice(0, 10)} · {(doc.sizeBytes / 1024).toFixed(0)} KB
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 'var(--space-2)', flexShrink: 0 }}>
+                      <button onClick={() => handleDownload(doc.docId)} className="modal-btn modal-btn--outline-primary" style={{ flex: 'none', padding: 'var(--space-1) var(--space-3)' }}>
+                        Download
+                      </button>
+                      {isAdmin && confirmDelDoc !== doc.docId && (
+                        <button onClick={() => setConfirmDelDoc(doc.docId)} className="modal-btn modal-btn--outline-danger" style={{ flex: 'none', padding: 'var(--space-1) var(--space-3)' }}>
+                          Delete
+                        </button>
+                      )}
+                      {isAdmin && confirmDelDoc === doc.docId && (
+                        <>
+                          <button onClick={() => setConfirmDelDoc(null)} className="modal-btn modal-btn--cancel" style={{ flex: 'none', padding: 'var(--space-1) var(--space-3)' }}>Cancel</button>
+                          <button onClick={() => handleDeleteDoc(doc.docId)} disabled={deletingDoc} className="modal-btn modal-btn--danger" style={{ flex: 'none', padding: 'var(--space-1) var(--space-3)' }}>
+                            {deletingDoc ? 'Deleting…' : 'Confirm'}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 

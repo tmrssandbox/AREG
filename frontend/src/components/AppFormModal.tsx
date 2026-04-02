@@ -1,5 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { api, App, ServiceHoursValue, ServiceLevelValue, ConfigValue } from '../lib/api';
+
 import './Modal.css';
 
 // Monthly downtime minutes for a given service hours + service level combination
@@ -15,7 +16,7 @@ function Info({ tip }: { tip: string }) {
 interface Props {
   app?: App;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (savedApp?: App) => void;
 }
 
 export default function AppFormModal({ app, onClose, onSaved }: Props) {
@@ -113,9 +114,13 @@ export default function AppFormModal({ app, onClose, onSaved }: Props) {
         }
       }
 
-      if (isEdit) await api.updateApp(app.appId, payload as Partial<App>);
-      else        await api.createApp(payload as Partial<App>);
-      onSaved();
+      if (isEdit) {
+        await api.updateApp(app.appId, payload as Partial<App>);
+        onSaved();
+      } else {
+        const newApp = await api.createApp(payload as Partial<App>);
+        onSaved(newApp);
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {

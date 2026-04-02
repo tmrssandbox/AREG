@@ -27,6 +27,19 @@ export interface App {
   modifiedAt?: string;
 }
 
+export interface ContractDoc {
+  docId: string;
+  appId: string;
+  filename: string;
+  description: string;
+  s3Key: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedBy: string;
+  uploadedAt: string;
+  confirmed: boolean;
+}
+
 export interface AuditEntry {
   action: string;
   userEmail: string;
@@ -98,4 +111,16 @@ export const api = {
   deleteConfigValue:  (category: string, id: string) =>
                         request<void>('DELETE', `/config/${category}/values/${id}`),
   seedConfig:         () => request<{ seeded: string[]; skipped: string[] }>('POST', '/config/seed'),
+
+  // Contracts
+  listContracts:      (appId: string) =>
+                        request<{ items: ContractDoc[] }>('GET', `/apps/${appId}/contracts`),
+  getUploadUrl:       (appId: string, body: { filename: string; contentType: string; sizeBytes: number; description: string }) =>
+                        request<{ docId: string; uploadUrl: string }>('POST', `/apps/${appId}/contracts/upload-url`, body),
+  confirmUpload:      (appId: string, docId: string) =>
+                        request<ContractDoc>('POST', `/apps/${appId}/contracts/${docId}/confirm`),
+  getDownloadUrl:     (appId: string, docId: string) =>
+                        request<{ downloadUrl: string }>('GET', `/apps/${appId}/contracts/${docId}/download-url`),
+  deleteContract:     (appId: string, docId: string) =>
+                        request<void>('DELETE', `/apps/${appId}/contracts/${docId}`),
 };
