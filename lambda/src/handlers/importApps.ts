@@ -6,8 +6,8 @@ import { writeAudit } from '../lib/auditLog';
 import { getCaller, requireAdmin } from '../lib/auth';
 import { ok, badRequest, forbidden } from '../lib/response';
 
-const REQUIRED_COLS = ['name', 'description', 'Vendor Name', 'TMRS Business Owner', 'TMRS Technical Contact', 'Service Hours', 'Service Level'] as const;
-const OPTIONAL_COLS = ['TMRS Business Contact', 'Vendor Business Contact', 'Vendor Technical Contact', 'Department', 'Business Criticality', 'Renewal Date', 'Notes', 'Target Feature Utilization', 'Feature Utilization Status'] as const;
+const REQUIRED_COLS = ['name'] as const;
+const OPTIONAL_COLS = ['description', 'Vendor Name', 'TMRS Business Owner', 'TMRS Technical Contact', 'TMRS Business Contact', 'Vendor Business Contact', 'Vendor Technical Contact', 'Service Hours', 'Service Level', 'Department', 'Business Criticality', 'Renewal Date', 'Notes', 'Target Feature Utilization', 'Feature Utilization Status'] as const;
 const ALL_COLS = [...REQUIRED_COLS, ...OPTIONAL_COLS];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
